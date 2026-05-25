@@ -99,3 +99,71 @@ test("run logging blocks keep when checks failed before mutating state", async (
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });
+
+test("run logging journals and restores a rejected Run Result while preserving ASI", async () => {
+  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-log-"));
+  const execCalls = [];
+  try {
+    selectActiveResearch(projectDir, "default");
+    fs.writeFileSync(researchJournalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
+    const state = createResearchState();
+    state.name = "Speed";
+    state.metricName = "total_ms";
+    state.metricUnit = "ms";
+
+    const result = await recordRunResult({
+      commit: "pending",
+      metric: 120,
+      status: "discard",
+      description: "try cache",
+      metrics: { compile_ms: 70 },
+      asi: { hypothesis: "cache lookup", rollback_reason: "slower", next_action_hint: "try pooling" },
+    }, fakeDeps(projectDir, state, execCalls));
+
+    assert.equal(result.ok, true);
+    assert.equal(state.results.length, 1);
+    assert.deepEqual(execCalls.map(([command, args]) => `${command} ${args[0]}`), ["bash -c"]);
+    const lines = fs.readFileSync(researchJournalPath(projectDir), "utf-8").trim().split("\n");
+    assert.equal(lines.length, 2);
+    const entry = JSON.parse(lines[1]);
+    assert.equal(entry.status, "discard");
+    assert.deepEqual(entry.asi, {
+      hypothesis: "cache lookup",
+      rollback_reason: "slower",
+      next_action_hint: "try pooling",
+    });
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("run logging rejects missing known secondary metrics before side effects", async () => {
+  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-log-"));
+  const execCalls = [];
+  try {
+    selectActiveResearch(projectDir, "default");
+    fs.writeFileSync(researchJournalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
+    const state = createResearchState();
+    state.name = "Speed";
+    state.metricName = "total_ms";
+    state.metricUnit = "ms";
+    state.secondaryMetrics = [{ name: "compile_ms", unit: "ms" }];
+
+    const result = await recordRunResult({
+      commit: "pending",
+      metric: 100,
+      status: "discard",
+      description: "missing secondary",
+      metrics: {},
+    }, fakeDeps(projectDir, state, execCalls));
+
+    assert.equal(result.ok, false);
+    assert.match(result.text, /Missing secondary metrics: compile_ms/);
+    assert.equal(state.results.length, 0);
+    assert.deepEqual(execCalls, []);
+    const lines = fs.readFileSync(researchJournalPath(projectDir), "utf-8").trim().split("\n");
+    assert.equal(lines.length, 1);
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});

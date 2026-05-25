@@ -64,3 +64,30 @@ test("validator accepts complete research with matching primary metric", async (
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("validator reports missing Research Journal without running goal.sh", async () => {
+  const dir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-validator-"));
+  let execCount = 0;
+  try {
+    const researchDir = ensureActiveResearchDirectory(dir);
+    fs.writeFileSync(path.join(researchDir, "goal.md"), "# Goal");
+    fs.writeFileSync(path.join(researchDir, "goal.sh"), "#!/usr/bin/env bash\n");
+
+    const result = await validateResearch({
+      workDir: dir,
+      pi: {
+        async exec() {
+          execCount++;
+          return { code: 0, killed: false, stdout: "METRIC total_ms=1\n", stderr: "" };
+        },
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(execCount, 0);
+    assert.equal(result.parsedMetrics, null);
+    assert.equal(result.issues.some((issue) => issue.code === "missing_jsonl"), true);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
