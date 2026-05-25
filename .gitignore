@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Package manager debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime / test output
+coverage/
+.nyc_output/
+*.log
+
+# pi-goal local research state
+.goal/
+goal.jsonl
+goal.md
+goal.dashboard.html
+
+# Local scratch / agent working state
+.scratch/
+.pi/
+
+# Environment and local config
+.env
+.env.*
+!.env.example
+*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build caches
+.cache/
+.turbo/
+.vite/
+dist/
+build/
