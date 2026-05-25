@@ -12,7 +12,7 @@ import { isBetter, type ResearchState, type RunResult } from "./domain/research-
 
 export type { LogRunParams } from "./domain/run-result.ts";
 
-export interface LogRunDeps {
+export interface RecordRunResultDeps {
   pi: WorkspaceExecAdapter;
   workDir: string;
   state: ResearchState;
@@ -23,12 +23,12 @@ export interface LogRunDeps {
   broadcastDashboardUpdate(workDir: string): void;
 }
 
-export interface LogRunBlockedResult {
+export interface RecordRunResultBlocked {
   ok: false;
   text: string;
 }
 
-export interface LogRunSuccessResult {
+export interface RecordRunResultSuccess {
   ok: true;
   text: string;
   runResult: RunResult;
@@ -40,9 +40,9 @@ export interface LogRunSuccessResult {
   beforeSteer: string | null;
 }
 
-export type LogRunResult = LogRunBlockedResult | LogRunSuccessResult;
+export type RecordRunResult = RecordRunResultBlocked | RecordRunResultSuccess;
 
-export async function logRunResult(params: LogRunParams, deps: LogRunDeps): Promise<LogRunResult> {
+export async function recordRunResult(params: LogRunParams, deps: RecordRunResultDeps): Promise<RecordRunResult> {
   const state = deps.state;
   const validationError = validateRunResultInput({
     state,

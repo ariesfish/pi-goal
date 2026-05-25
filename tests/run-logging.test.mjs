@@ -4,7 +4,7 @@ import * as path from "node:path";
 import test from "node:test";
 import { tmpdir } from "node:os";
 
-import { logRunResult } from "../extensions/pi-goal/run-logging.ts";
+import { recordRunResult } from "../extensions/pi-goal/run-result-workflow.ts";
 import { selectActiveResearch } from "../extensions/pi-goal/persistence/research-store.ts";
 import { researchJournalPath } from "../extensions/pi-goal/persistence/research-paths.ts";
 import { createResearchState } from "../extensions/pi-goal/domain/research-state.ts";
@@ -51,7 +51,7 @@ test("run logging records a kept Run Result, commits workspace, and appends jour
     state.metricName = "total_ms";
     state.metricUnit = "ms";
 
-    const result = await logRunResult({
+    const result = await recordRunResult({
       commit: "pending",
       metric: 100,
       status: "keep",
@@ -85,7 +85,7 @@ test("run logging blocks keep when checks failed before mutating state", async (
     const deps = fakeDeps(projectDir, state);
     deps.lastRunChecks = { pass: false, output: "nope", duration: 0.1 };
 
-    const result = await logRunResult({
+    const result = await recordRunResult({
       commit: "pending",
       metric: 100,
       status: "keep",

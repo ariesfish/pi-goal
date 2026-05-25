@@ -11,7 +11,7 @@ import {
   isBetter,
   type ResearchState,
 } from "../domain/research-state.ts";
-import { logRunResult } from "../run-logging.ts";
+import { recordRunResult } from "../run-result-workflow.ts";
 
 export interface LogExperimentToolDeps {
   getRuntime(ctx: ExtensionContext): SessionRuntime;
@@ -57,7 +57,7 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
       };
     }
     const workDir = resolveWorkDir(ctx.cwd);
-    const result = await logRunResult(params, {
+    const result = await recordRunResult(params, {
       pi,
       workDir,
       state,
