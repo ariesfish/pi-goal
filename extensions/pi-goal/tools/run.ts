@@ -15,7 +15,8 @@ import {
   onResearchRunFinished as controllerOnRunExperimentFinished,
   shouldBlockResearchRun,
 } from "../protocol/research-phase.ts";
-import { readResearchFileContract, shouldUseScriptCommandOnly } from "../persistence/research-files.ts";
+import { readResearchFileContract } from "../persistence/research-files.ts";
+import { shouldUseScriptCommandOnly } from "../execution/research-command-policy.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { RunParams } from "../support/schema.ts";
 import { currentRuns, type ResearchState } from "../domain/research-state.ts";

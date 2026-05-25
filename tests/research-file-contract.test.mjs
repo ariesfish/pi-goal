@@ -4,12 +4,12 @@ import * as path from "node:path";
 import test from "node:test";
 import { tmpdir } from "node:os";
 
+import { readResearchFileContract } from "../extensions/pi-goal/persistence/research-files.ts";
 import {
   activationSnapshotFor,
   promptSnapshotFor,
-  readResearchFileContract,
-  shouldUseScriptCommandOnly,
-} from "../extensions/pi-goal/persistence/research-files.ts";
+} from "../extensions/pi-goal/protocol/research-file-snapshots.ts";
+import { shouldUseScriptCommandOnly } from "../extensions/pi-goal/execution/research-command-policy.ts";
 import { ensureActiveResearchDirectory } from "../extensions/pi-goal/persistence/research-directory.ts";
 
 test("research file contract summarizes active research files and config header", () => {

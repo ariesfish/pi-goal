@@ -3,7 +3,7 @@ import { Text } from "@mariozechner/pi-tui";
 import * as fs from "node:fs";
 
 import { readRunLimit, resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
-import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/experiment-workspace.ts";
+import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/research-workspace.ts";
 import type { HookPayload, ResearchSnapshot } from "../execution/hooks.ts";
 import { onResearchInitialized as controllerOnInitExperiment } from "../protocol/research-phase.ts";
 import { ensureResearchJournalPath } from "../persistence/research-paths.ts";

@@ -14,11 +14,11 @@ import {
   type ResearchProtocolOptions,
   type ResearchPhaseState,
 } from "./research-phase.ts";
+import type { ResearchFileContract } from "../persistence/research-files.ts";
 import {
   activationSnapshotFor,
   promptSnapshotFor,
-  type ResearchFileContract,
-} from "../persistence/research-files.ts";
+} from "./research-file-snapshots.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 
 export type PendingResearchResumeDecision =

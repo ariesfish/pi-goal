@@ -18,7 +18,7 @@ export interface ResearchWorkspaceCheck {
   error: string | null;
 }
 
-export interface CommitKeptRunOptions {
+export interface CommitKeptRunResultOptions {
   pi: WorkspaceExecAdapter;
   workDir: string;
   description: string;
@@ -81,8 +81,8 @@ export function formatWorkspaceSafetyError(check: ResearchWorkspaceCheck): strin
   ].filter(Boolean).join("\n");
 }
 
-export async function commitKeptExperiment(
-  options: CommitKeptRunOptions,
+export async function commitKeptRunResult(
+  options: CommitKeptRunResultOptions,
 ): Promise<CommitKeptRunResult> {
   let text = "";
   let commit: string | null = null;
@@ -133,7 +133,7 @@ export async function commitKeptExperiment(
   return { text, commit };
 }
 
-export async function revertRejectedExperiment(options: {
+export async function restoreRejectedRunResult(options: {
   pi: WorkspaceExecAdapter;
   workDir: string;
   status: string;

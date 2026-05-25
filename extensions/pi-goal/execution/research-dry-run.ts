@@ -1,7 +1,8 @@
 import * as path from "node:path";
 
 import { isGoalShCommand, parseMetricLines } from "./experiment-runner.ts";
-import { shouldUseScriptCommandOnly, type ResearchFileContract } from "../persistence/research-files.ts";
+import type { ResearchFileContract } from "../persistence/research-files.ts";
+import { shouldUseScriptCommandOnly } from "./research-command-policy.ts";
 import {
   researchValidationError,
   type ResearchValidationIssue,

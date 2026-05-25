@@ -1,10 +1,10 @@
-import { validateResearchDryRun, type ResearchDryRunExecAdapter } from "../execution/research-dry-run.ts";
-import { validateResearchFiles } from "../persistence/research-file-validation.ts";
+import { validateResearchDryRun, type ResearchDryRunExecAdapter } from "./execution/research-dry-run.ts";
+import { validateResearchFiles } from "./persistence/research-file-validation.ts";
 import {
   researchValidationResult,
   type ResearchValidationIssue,
   type ResearchValidationResult,
-} from "../domain/research-validation.ts";
+} from "./domain/research-validation.ts";
 
 export type ValidatorExecAdapter = ResearchDryRunExecAdapter;
 export type { ResearchValidationIssue, ResearchValidationResult };

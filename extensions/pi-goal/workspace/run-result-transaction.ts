@@ -1,8 +1,8 @@
 import {
-  commitKeptExperiment,
-  revertRejectedExperiment,
+  commitKeptRunResult,
+  restoreRejectedRunResult,
   type WorkspaceExecAdapter,
-} from "./experiment-workspace.ts";
+} from "./research-workspace.ts";
 
 export interface RunWorkspaceTransactionOptions {
   pi: WorkspaceExecAdapter;
@@ -19,11 +19,11 @@ export interface RunWorkspaceTransactionResult {
   commit: string | null;
 }
 
-export async function applyKeptRunTransaction(
+export async function applyKeptRunResultTransaction(
   options: RunWorkspaceTransactionOptions,
 ): Promise<RunWorkspaceTransactionResult> {
   if (options.status !== "keep") return { text: "", commit: null };
-  return commitKeptExperiment({
+  return commitKeptRunResult({
     pi: options.pi,
     workDir: options.workDir,
     description: options.description,
@@ -34,9 +34,9 @@ export async function applyKeptRunTransaction(
   });
 }
 
-export async function restoreRejectedRunTransaction(
+export async function restoreRejectedRunResultTransaction(
   options: Pick<RunWorkspaceTransactionOptions, "pi" | "workDir" | "status">,
 ): Promise<string> {
   if (options.status === "keep") return "";
-  return revertRejectedExperiment({ pi: options.pi, workDir: options.workDir, status: options.status });
+  return restoreRejectedRunResult({ pi: options.pi, workDir: options.workDir, status: options.status });
 }

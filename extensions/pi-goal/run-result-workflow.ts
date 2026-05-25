@@ -6,8 +6,8 @@ import {
 } from "./domain/run-result.ts";
 import { runResultJournalEntry, appendRunResultToJournal } from "./persistence/run-result-store.ts";
 import { formatLogSummary } from "./ui/log-result-renderer.ts";
-import { applyKeptRunTransaction, restoreRejectedRunTransaction } from "./workspace/run-workspace-transaction.ts";
-import type { WorkspaceExecAdapter } from "./workspace/experiment-workspace.ts";
+import { applyKeptRunResultTransaction, restoreRejectedRunResultTransaction } from "./workspace/run-result-transaction.ts";
+import type { WorkspaceExecAdapter } from "./workspace/research-workspace.ts";
 import { isBetter, type ResearchState, type RunResult } from "./domain/research-state.ts";
 
 export type { LogRunParams } from "./domain/run-result.ts";
@@ -54,7 +54,7 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
   const applied = applyRunResult(state, params);
   let text = formatLogSummary({ state, applied, params });
 
-  const keepResult = await applyKeptRunTransaction({
+  const keepResult = await applyKeptRunResultTransaction({
     pi: deps.pi,
     workDir: deps.workDir,
     description: params.description,
@@ -74,7 +74,7 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
     deps.broadcastDashboardUpdate(deps.workDir);
   }
 
-  text += await restoreRejectedRunTransaction({
+  text += await restoreRejectedRunResultTransaction({
     pi: deps.pi,
     workDir: deps.workDir,
     status: params.status,

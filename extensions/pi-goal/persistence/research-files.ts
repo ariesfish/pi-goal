@@ -8,7 +8,6 @@ import {
   researchRulesPath,
   researchScriptPath,
 } from "./research-paths.ts";
-import type { ActivationSnapshot, PromptSnapshot } from "../protocol/research-phase.ts";
 
 export interface ResearchFileContract {
   workDir: string;
@@ -78,32 +77,6 @@ export function readResearchFileContract(workDir: string): ResearchFileContract 
     invalidChecks: hasChecks && !isFile(checksPath) ? `${checksPath} exists but is not a file.` : null,
     journalReadError,
   };
-}
-
-export function activationSnapshotFor(contract: ResearchFileContract, userGoal: string): ActivationSnapshot {
-  return {
-    userGoal,
-    hasRules: contract.hasRules,
-    hasConfig: contract.hasConfigHeader,
-    hasBenchmarkScript: contract.hasBenchmarkScript,
-  };
-}
-
-export function promptSnapshotFor(contract: ResearchFileContract): PromptSnapshot {
-  return {
-    hasRules: contract.hasRules,
-    hasConfig: contract.hasConfigHeader,
-    hasBenchmarkScript: contract.hasBenchmarkScript,
-    hasIdeas: contract.hasIdeas,
-    hasChecks: contract.hasChecks,
-    mdPath: contract.rulesPath,
-    ideasPath: contract.ideasPath,
-    checksPath: contract.checksPath,
-  };
-}
-
-export function shouldUseScriptCommandOnly(contract: ResearchFileContract): boolean {
-  return contract.hasBenchmarkScript && !contract.invalidBenchmarkScript;
 }
 
 function isFile(filePath: string): boolean {

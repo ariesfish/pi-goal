@@ -38,7 +38,7 @@ import {
 import { resolveGoalShortcuts } from "./support/shortcuts.ts";
 import { readRunLimit, resolveWorkDir, validateWorkDir } from "./persistence/goal-config.ts";
 
-import { checkResearchWorkspace, formatWorkspaceSafetyError } from "./workspace/experiment-workspace.ts";
+import { checkResearchWorkspace, formatWorkspaceSafetyError } from "./workspace/research-workspace.ts";
 import { researchJournalPath } from "./persistence/research-paths.ts";
 import {
   createRuntimeStore,

@@ -2,12 +2,12 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 
 import { validateWorkDir, resolveWorkDir } from "../persistence/goal-config.ts";
-import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/experiment-workspace.ts";
+import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/research-workspace.ts";
 import { ValidateResearchParams } from "../support/schema.ts";
 import {
   formatResearchValidationResult,
   validateResearch,
-} from "../support/research-validator.ts";
+} from "../research-validation-workflow.ts";
 
 export function registerValidateResearchTool(pi: ExtensionAPI): void {
   pi.registerTool({
