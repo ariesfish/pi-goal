@@ -24,11 +24,7 @@ import {
   appendHookLogEntryIfConfigured,
   type HookPayload,
 } from "./execution/hooks.ts";
-import {
-  cloneResearchState,
-  createResearchState,
-  computeConfidence,
-} from "./domain/research-state.ts";
+import { createResearchState } from "./domain/research-state.ts";
 import {
   clearResearchPhase,
   deactivateResearch,
@@ -36,14 +32,13 @@ import {
   type ResearchProtocolOptions,
 } from "./protocol/research-phase.ts";
 import { resolveGoalShortcuts } from "./support/shortcuts.ts";
-import { readRunLimit, resolveWorkDir, validateWorkDir } from "./persistence/goal-config.ts";
+import { resolveWorkDir, validateWorkDir } from "./persistence/goal-config.ts";
 
 import { checkResearchWorkspace, formatWorkspaceSafetyError } from "./workspace/research-workspace.ts";
 import { researchJournalPath } from "./persistence/research-paths.ts";
 import {
   createRuntimeStore,
   type SessionRuntime,
-  type LogDetails,
 } from "./support/runtime.ts";
 import { createDashboardServer } from "./ui/browser-dashboard.ts";
 import { createDashboardOverlayController } from "./ui/dashboard-overlay.ts";
@@ -55,7 +50,6 @@ import { registerRunExperimentTool } from "./tools/run.ts";
 import { registerLogExperimentTool } from "./tools/log.ts";
 import {
   buildResearchSnapshot,
-  hydrateResearchStateFromJournal,
   readLastRunResult,
   selectActiveResearch,
 } from "./persistence/research-store.ts";
@@ -67,8 +61,8 @@ import {
   shouldResumeResearchAfterCompact,
   shouldResumeResearchAfterTurn,
   startResearchActivation,
-  syncResearchPhaseFromResearchFiles,
 } from "./protocol/research-protocol.ts";
+import { restoreActiveResearchRuntime } from "./persistence/research-runtime-restore.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -192,65 +186,12 @@ export default function goalExtension(pi: ExtensionAPI) {
   const reconstructState = (ctx: ExtensionContext) => {
     const runtime = getRuntime(ctx);
     resume.cancel(runtime);
-    runtime.lastRunChecks = null;
-    runtime.lastRunDuration = null;
-    runtime.activeRun = null;
-    resetResearchPhaseForAgentStart(runtime.loop);
-    runtime.loop.autoResumeTurns = 0;
-    runtime.loop.activationTurns = 0;
-    runtime.state = createResearchState();
-
-    let state = runtime.state;
-
-    // Resolve effective working directory (config stays in ctx.cwd, files in workDir)
-    const workDir = resolveWorkDir(ctx.cwd);
-
-    // Primary: read from goal.jsonl (alongside goal.md/sh)
-    const jsonlPath = researchJournalPath(workDir);
-    let loadedFromJsonl = false;
-    try {
-      if (fs.existsSync(jsonlPath)) {
-        loadedFromJsonl = hydrateResearchStateFromJournal(state, fs.readFileSync(jsonlPath, "utf-8"));
-      }
-    } catch {
-      // Fall through to session history
-    }
-
-    // Fallback: reconstruct from pi session history when no research journal has been logged yet.
-    if (!loadedFromJsonl) {
-      for (const entry of ctx.sessionManager.getBranch()) {
-        if (entry.type !== "message") continue;
-        const msg = entry.message;
-        if (msg.role !== "toolResult" || msg.toolName !== "log_goal")
-          continue;
-        const details = msg.details as LogDetails | undefined;
-        if (details?.state) {
-          runtime.state = cloneResearchState(details.state);
-          state = runtime.state;
-          if (!state.secondaryMetrics) state.secondaryMetrics = [];
-          if (state.metricUnit === "s" && state.metricName === "metric") {
-            state.metricUnit = "";
-          }
-          for (const r of state.results) {
-            if (!r.metrics) r.metrics = {};
-            if (r.confidence === undefined) r.confidence = null;
-          }
-          if (state.confidence === undefined) {
-            state.confidence = computeConfidence(state.results, state.currentExperimentIndex, state.bestDirection);
-          }
-        }
-      }
-    }
-
-
-    // Read max experiments from config file
-    state.runLimit = readRunLimit(ctx.cwd);
-
-    // Auto-enter goal mode when a persisted research journal exists.
-    // If a skill created goal.md + goal.sh but did not initialize,
-    // enter needs_init so the extension can push the agent across the seam.
-    syncResearchPhaseFromResearchFiles(runtime.loop, readResearchFileContract(workDir));
-
+    restoreActiveResearchRuntime({
+      runtime,
+      workDir: resolveWorkDir(ctx.cwd),
+      ctxCwd: ctx.cwd,
+      sessionBranch: ctx.sessionManager.getBranch(),
+    });
     updateWidget(ctx);
   };
 

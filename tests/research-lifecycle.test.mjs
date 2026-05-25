@@ -10,8 +10,10 @@ import {
   readLastRunResult,
   selectActiveResearch,
 } from "../extensions/pi-goal/persistence/research-store.ts";
+import { restoreActiveResearchRuntime } from "../extensions/pi-goal/persistence/research-runtime-restore.ts";
 import { researchJournalPath } from "../extensions/pi-goal/persistence/research-paths.ts";
 import { createResearchState } from "../extensions/pi-goal/domain/research-state.ts";
+import { createSessionRuntime } from "../extensions/pi-goal/support/runtime.ts";
 
 test("research lifecycle selects a sanitized active research and creates its directory", () => {
   const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-lifecycle-"));
@@ -52,6 +54,48 @@ test("research lifecycle hydrates state and reads the latest Run Result", () => 
       run_count: 2,
       goal: "Speed",
     });
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("research runtime restore prefers Research Journal over session history and syncs phase", () => {
+  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-lifecycle-"));
+  try {
+    selectActiveResearch(projectDir, "default");
+    fs.writeFileSync(researchJournalPath(projectDir), [
+      '{"type":"config","name":"Journal","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}',
+      '{"run":1,"commit":"aaa1111","metric":100,"status":"keep","description":"journal baseline","timestamp":1,"metrics":{}}',
+    ].join("\n") + "\n");
+    const runtime = createSessionRuntime();
+    const staleState = createResearchState();
+    staleState.name = "Session history";
+    staleState.results.push({
+      commit: "stale",
+      metric: 1,
+      metrics: {},
+      status: "keep",
+      description: "stale",
+      timestamp: 1,
+      experimentIndex: 0,
+      confidence: null,
+    });
+
+    const result = restoreActiveResearchRuntime({
+      runtime,
+      workDir: projectDir,
+      ctxCwd: projectDir,
+      sessionBranch: [{
+        type: "message",
+        message: { role: "toolResult", toolName: "log_goal", details: { state: staleState } },
+      }],
+    });
+
+    assert.equal(result.loadedFromJournal, true);
+    assert.equal(runtime.state.name, "Journal");
+    assert.equal(runtime.state.results[0].description, "journal baseline");
+    assert.equal(runtime.loop.mode, true);
+    assert.equal(runtime.loop.phase, "looping");
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
