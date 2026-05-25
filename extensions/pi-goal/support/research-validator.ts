@@ -1,29 +1,13 @@
-import * as path from "node:path";
+import { validateResearchDryRun, type ResearchDryRunExecAdapter } from "../execution/research-dry-run.ts";
+import { validateResearchFiles } from "../persistence/research-file-validation.ts";
+import {
+  researchValidationResult,
+  type ResearchValidationIssue,
+  type ResearchValidationResult,
+} from "../domain/research-validation.ts";
 
-import { isGoalShCommand, parseMetricLines } from "../execution/experiment-runner.ts";
-import { readResearchFileContract, shouldUseScriptCommandOnly } from "../persistence/research-files.ts";
-
-export interface ValidatorExecAdapter {
-  exec(
-    command: string,
-    args: string[],
-    options: { cwd?: string; timeout?: number },
-  ): Promise<{ code: number | null; killed?: boolean; stdout: string; stderr: string }>;
-}
-
-export interface ResearchValidationIssue {
-  code: string;
-  severity: "error" | "warning";
-  message: string;
-}
-
-export interface ResearchValidationResult {
-  ok: boolean;
-  workDir: string;
-  metricName: string | null;
-  issues: ResearchValidationIssue[];
-  parsedMetrics: Record<string, number> | null;
-}
+export type ValidatorExecAdapter = ResearchDryRunExecAdapter;
+export type { ResearchValidationIssue, ResearchValidationResult };
 
 export async function validateResearch(options: {
   workDir: string;
@@ -32,69 +16,23 @@ export async function validateResearch(options: {
   timeoutMs?: number;
 }): Promise<ResearchValidationResult> {
   const { workDir, pi, dryRun = true, timeoutMs = 60_000 } = options;
-  const issues: ResearchValidationIssue[] = [];
-  const contract = readResearchFileContract(workDir);
+  const fileValidation = validateResearchFiles(workDir);
+  const metricName = fileValidation.contract.metricName;
+  const dryRunValidation = await validateResearchDryRun({
+    workDir,
+    pi,
+    contract: fileValidation.contract,
+    metricName,
+    dryRun,
+    timeoutMs,
+  });
 
-  if (!contract.hasRules) {
-    issues.push(error("missing_rules", `${contract.rulesPath} does not exist.`));
-  } else if (contract.invalidRules) {
-    issues.push(error("invalid_rules", contract.invalidRules));
-  }
-
-  if (!contract.hasBenchmarkScript) {
-    issues.push(error("missing_script", `${contract.scriptPath} does not exist.`));
-  } else if (contract.invalidBenchmarkScript) {
-    issues.push(error("invalid_script", contract.invalidBenchmarkScript));
-  }
-
-  if (!contract.hasJournal) {
-    issues.push(error("missing_jsonl", `${contract.journalPath} does not exist. Call init_goal.`));
-  } else if (contract.journalReadError) {
-    issues.push(error("read_failed", `Could not read ${contract.journalPath}: ${contract.journalReadError}`));
-  } else if (!contract.hasConfigHeader) {
-    issues.push(error("missing_config_header", `${contract.journalPath} has no config header. Call init_goal.`));
-  }
-
-  if (contract.invalidChecks) {
-    issues.push(error("invalid_checks", contract.invalidChecks));
-  }
-
-  const metricName = contract.metricName;
-  let parsedMetrics: Record<string, number> | null = null;
-  if (dryRun && shouldUseScriptCommandOnly(contract) && metricName) {
-    if (!isGoalShCommand("bash goal.sh")) {
-      issues.push(error("invalid_script_command", "Internal validator command was rejected by goal.sh guard."));
-    } else {
-      try {
-        const result = await pi.exec("bash", [contract.scriptPath], { cwd: workDir, timeout: timeoutMs });
-        const output = `${result.stdout}\n${result.stderr}`;
-        parsedMetrics = Object.fromEntries(parseMetricLines(output));
-        if (result.killed) {
-          issues.push(error("script_timeout", `${path.basename(contract.scriptPath)} timed out during validation.`));
-        } else if (result.code !== 0) {
-          issues.push(error("script_failed", `${path.basename(contract.scriptPath)} exited ${result.code} during validation.`));
-        } else if (!(metricName in parsedMetrics)) {
-          issues.push(error(
-            "missing_primary_metric",
-            `Expected dry-run output to contain METRIC ${metricName}=<number>. Parsed: ${Object.keys(parsedMetrics).join(", ") || "(none)"}.`,
-          ));
-        }
-      } catch (validationError) {
-        issues.push(error(
-          "script_exec_failed",
-          `Could not run ${path.basename(contract.scriptPath)} during validation: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
-        ));
-      }
-    }
-  }
-
-  return {
-    ok: !issues.some((issue) => issue.severity === "error"),
+  return researchValidationResult({
     workDir,
     metricName,
-    issues,
-    parsedMetrics,
-  };
+    issues: [...fileValidation.issues, ...dryRunValidation.issues],
+    parsedMetrics: dryRunValidation.parsedMetrics,
+  });
 }
 
 export function formatResearchValidationResult(result: ResearchValidationResult): string {
@@ -111,8 +49,4 @@ export function formatResearchValidationResult(result: ResearchValidationResult)
     }
   }
   return lines.join("\n");
-}
-
-function error(code: string, message: string): ResearchValidationIssue {
-  return { code, severity: "error", message };
 }
