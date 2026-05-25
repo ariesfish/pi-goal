@@ -17,24 +17,20 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
-import * as fs from "node:fs";
 import {
   runHook,
   steerMessageFor,
   appendHookLogEntryIfConfigured,
   type HookPayload,
 } from "./execution/hooks.ts";
-import { createResearchState } from "./domain/research-state.ts";
 import {
-  clearResearchPhase,
-  deactivateResearch,
   resetResearchPhaseForAgentStart,
   type ResearchProtocolOptions,
 } from "./protocol/research-phase.ts";
 import { resolveGoalShortcuts } from "./support/shortcuts.ts";
-import { resolveWorkDir, validateWorkDir } from "./persistence/goal-config.ts";
+import { resolveWorkDir } from "./persistence/goal-config.ts";
 
-import { checkResearchWorkspace, formatWorkspaceSafetyError } from "./workspace/research-workspace.ts";
+import { checkResearchWorkspace } from "./workspace/research-workspace.ts";
 import { researchJournalPath } from "./persistence/research-paths.ts";
 import {
   createRuntimeStore,
@@ -51,7 +47,6 @@ import { registerLogExperimentTool } from "./tools/log.ts";
 import {
   buildResearchSnapshot,
   readLastRunResult,
-  selectActiveResearch,
 } from "./persistence/research-store.ts";
 import { readResearchFileContract } from "./persistence/research-files.ts";
 import {
@@ -60,9 +55,9 @@ import {
   composeResearchSystemPrompt,
   shouldResumeResearchAfterCompact,
   shouldResumeResearchAfterTurn,
-  startResearchActivation,
 } from "./protocol/research-protocol.ts";
 import { restoreActiveResearchRuntime } from "./persistence/research-runtime-restore.ts";
+import { registerGoalCommand } from "./tools/goal-command.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -158,26 +153,6 @@ export default function goalExtension(pi: ExtensionAPI) {
     dashboardOverlay.clear();
     widget.clear(ctx);
   };
-
-  const researchHelp = () =>
-    [
-      "Usage: /goal [off|clear|export|reinit|select <research-id>|<text>]",
-      "",
-      "<text> enters goal mode and starts or resumes the loop.",
-      "reinit starts a new experiment in the active research with a fresh baseline.",
-      "select <research-id> switches the active research directory.",
-      "off leaves goal mode.",
-      "clear deletes goal.jsonl and turns goal mode off.",
-      "export opens a local live dashboard for goal.jsonl in your browser.",
-
-      "",
-      "Examples:",
-      "  /goal optimize unit test runtime, monitor correctness",
-      "  /goal model training, run 5 minutes of train.py and note the loss ratio as optimization target",
-      "  /goal reinit",
-      "  /goal select bundle-size",
-      "  /goal export",
-    ].join("\n");
 
   // -----------------------------------------------------------------------
   // State reconstruction
@@ -337,148 +312,20 @@ export default function goalExtension(pi: ExtensionAPI) {
   }
 
   // -----------------------------------------------------------------------
-  // Export: local live dashboard
+  // /goal command
   // -----------------------------------------------------------------------
 
-  // -----------------------------------------------------------------------
-  // /goal command — enter goal mode
-  // -----------------------------------------------------------------------
-
-  pi.registerCommand("goal", {
-    description: "Start, stop, clear, or resume goal mode",
-    handler: async (args, ctx) => {
-      const runtime = getRuntime(ctx);
-      const trimmedArgs = (args ?? "").trim();
-      const command = trimmedArgs.toLowerCase();
-
-      if (!trimmedArgs) {
-        ctx.ui.notify(researchHelp(), "info");
-        return;
-      }
-
-      if (command === "off") {
-        const wasRunning = !ctx.isIdle();
-
-        deactivateResearch(runtime.loop);
-        runtime.dashboardExpanded = false;
-        runtime.lastRunChecks = null;
-        runtime.lastRunDuration = null;
-        runtime.activeRun = null;
-        resume.cancel(runtime);
-        stopDashboardServer();
-        clearSessionUi(ctx);
-        if (wasRunning) ctx.abort();
-        ctx.ui.notify(
-          wasRunning ? "Research mode OFF — aborting current run" : "Research mode OFF",
-          "info"
-        );
-        return;
-      }
-
-      if (command === "export") {
-        await dashboardServer.export(ctx, resolveWorkDir(ctx.cwd));
-        return;
-      }
-
-      if (command === "select") {
-        ctx.ui.notify("Usage: /goal select <research-id>", "info");
-        return;
-      }
-
-      if (command.startsWith("select ")) {
-        const workDirError = validateWorkDir(ctx.cwd);
-        if (workDirError) {
-          ctx.ui.notify(workDirError, "error");
-          return;
-        }
-        const researchId = trimmedArgs.slice("select".length).trim();
-        if (!researchId) {
-          ctx.ui.notify("Usage: /goal select <research-id>", "info");
-          return;
-        }
-        const workDir = resolveWorkDir(ctx.cwd);
-        const selectedResearchId = selectActiveResearch(workDir, researchId);
-        reconstructState(ctx);
-        ctx.ui.notify(`Active research selected: ${selectedResearchId}`, "info");
-        return;
-      }
-
-      if (command === "reinit") {
-        if (runtime.state.results.length === 0) {
-          ctx.ui.notify("No runs yet — use init_goal to initialize the active research first", "info");
-          return;
-        }
-        resume.sendWhenReady(ctx, [
-          "Start a new Experiment in the active Research now.",
-          "Call start_goal with the updated metric, unit, and direction, then run the new baseline with run_goal and log_goal.",
-          "Use this only if the Research target is unchanged but the primary metric, direction, workload, measurement method, or baseline comparability changed.",
-        ].join("\n"));
-        return;
-      }
-
-      if (command === "clear") {
-        const jsonlPath = researchJournalPath(resolveWorkDir(ctx.cwd));
-        clearResearchPhase(runtime.loop);
-        runtime.dashboardExpanded = false;
-        runtime.lastRunChecks = null;
-        runtime.activeRun = null;
-        resume.cancel(runtime);
-        runtime.state = createResearchState();
-        stopDashboardServer();
-        updateWidget(ctx);
-
-        if (fs.existsSync(jsonlPath)) {
-          try {
-            fs.unlinkSync(jsonlPath);
-            ctx.ui.notify("Deleted goal.jsonl and turned goal mode OFF", "info");
-          } catch (error) {
-            ctx.ui.notify(
-              `Failed to delete goal.jsonl: ${error instanceof Error ? error.message : String(error)}`,
-              "error"
-            );
-          }
-        } else {
-          ctx.ui.notify("No goal.jsonl found. Research mode OFF", "info");
-        }
-        return;
-      }
-
-      if (runtime.loop.mode) {
-        ctx.ui.notify("Research already active — use '/goal off' to stop first", "info");
-        return;
-      }
-
-      const workDirError = validateWorkDir(ctx.cwd);
-      if (workDirError) {
-        ctx.ui.notify(workDirError, "error");
-        return;
-      }
-      const workDir = resolveWorkDir(ctx.cwd);
-      const dirtyCheck = await checkResearchWorkspace(pi, workDir);
-      const dirtyBlock = formatWorkspaceSafetyError(dirtyCheck);
-      if (dirtyBlock) {
-        ctx.ui.notify(dirtyBlock, "error");
-        return;
-      }
-      const activation = startResearchActivation(
-        runtime.loop,
-        readResearchFileContract(workDir),
-        trimmedArgs,
-        loopOptions,
-      );
-
-      ctx.ui.notify(activation.notification, "info");
-
-      const state = runtime.state;
-      const activationSteer = await fireHook({
-        event: "before",
-        cwd: workDir,
-        next_run: state.results.length + 1,
-        last_run: readLastRun(workDir),
-        research: buildResearchSnapshot(state),
-      });
-
-      resume.sendWhenReady(ctx, activationSteer ? `${activationSteer}\n\n${activation.kickoff}` : activation.kickoff);
-    },
+  registerGoalCommand(pi, {
+    getRuntime,
+    updateWidget,
+    clearSessionUi,
+    reconstructState,
+    stopDashboardServer,
+    exportDashboard: (ctx, workDir) => dashboardServer.export(ctx, workDir),
+    resume,
+    loopOptions,
+    fireHook,
+    buildResearchSnapshot,
+    checkWorkspace: checkResearchWorkspace,
   });
 }

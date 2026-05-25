@@ -12,7 +12,7 @@ import {
 } from "../execution/experiment-runner.ts";
 import {
   researchAwaitingLogBlockMessage,
-  onResearchRunFinished as controllerOnRunExperimentFinished,
+  onResearchRunFinished,
   shouldBlockResearchRun,
 } from "../protocol/research-phase.ts";
 import { readResearchFileContract } from "../persistence/research-files.ts";
@@ -132,7 +132,7 @@ export function registerRunExperimentTool(pi: ExtensionAPI, deps: RunExperimentT
     runtime.lastRunChecks = details.checksPass !== null
       ? { pass: details.checksPass, output: details.checksOutput, duration: details.checksDuration }
       : null;
-    controllerOnRunExperimentFinished(runtime.loop, {
+    onResearchRunFinished(runtime.loop, {
       command: details.command,
       passed: details.passed,
       crashed: details.crashed,

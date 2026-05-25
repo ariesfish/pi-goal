@@ -5,7 +5,7 @@ import * as fs from "node:fs";
 import { readRunLimit, resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
 import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/research-workspace.ts";
 import type { HookPayload, ResearchSnapshot } from "../execution/hooks.ts";
-import { onResearchInitialized as controllerOnInitExperiment } from "../protocol/research-phase.ts";
+import { onResearchInitialized } from "../protocol/research-phase.ts";
 import { ensureResearchJournalPath } from "../persistence/research-paths.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { InitParams } from "../support/schema.ts";
@@ -149,7 +149,7 @@ function registerExperimentConfigTool(
       }
 
       const wasInactive = !runtime.loop.mode;
-      controllerOnInitExperiment(runtime.loop);
+      onResearchInitialized(runtime.loop);
       deps.updateWidget(ctx);
 
       if (wasInactive) {

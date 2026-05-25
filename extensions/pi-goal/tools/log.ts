@@ -3,7 +3,7 @@ import { Text } from "@mariozechner/pi-tui";
 import { resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
 import { formatMetricValue } from "../ui/metric-format.ts";
 import type { HookPayload, ResearchSnapshot } from "../execution/hooks.ts";
-import { onResearchRunLogged as controllerOnLogExperiment } from "../protocol/research-phase.ts";
+import { onResearchRunLogged } from "../protocol/research-phase.ts";
 import type { SessionRuntime, LogDetails } from "../support/runtime.ts";
 import { LogParams } from "../support/schema.ts";
 import {
@@ -82,7 +82,7 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
     runtime.lastRunChecks = null;
     runtime.lastRunDuration = null;
 
-    controllerOnLogExperiment(runtime.loop, result.limitReached);
+    onResearchRunLogged(runtime.loop, result.limitReached);
     if (result.limitReached) {
       text += `\n\n🛑 Maximum runs reached (${state.runLimit}) for the current experiment. STOP the research loop now.`;
       ctx.abort();
