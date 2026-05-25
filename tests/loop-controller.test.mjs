@@ -2,18 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  activateLoop,
-  composeResumeMessage,
-  createLoopControllerState,
+  activateResearch,
+  composeResearchPhaseResumeMessage,
+  createResearchPhaseState,
   detectPhaseFromFiles,
-  awaitingLogBlockMessage,
-  onInitExperiment,
-  onLogExperiment,
-  onRunExperimentFinished,
-  shouldAutoResumeAfterTurn,
-  shouldBlockRunExperiment,
-  systemPromptFor,
-} from "../extensions/pi-goal/loop-controller.ts";
+  researchAwaitingLogBlockMessage,
+  onResearchInitialized,
+  onResearchRunLogged,
+  onResearchRunFinished,
+  shouldResearchAutoResumeAfterTurn,
+  shouldBlockResearchRun,
+  researchPhaseSystemPromptFor,
+} from "../extensions/pi-goal/protocol/research-phase.ts";
 
 const options = {
   maxAutoResumeTurns: 20,
@@ -22,8 +22,8 @@ const options = {
 };
 
 test("activation without config enters setup phase and emits mandatory protocol", () => {
-  const state = createLoopControllerState();
-  const message = activateLoop(state, {
+  const state = createResearchPhaseState();
+  const message = activateResearch(state, {
     userGoal: "optimize tests",
     hasRules: false,
     hasConfig: false,
@@ -34,12 +34,12 @@ test("activation without config enters setup phase and emits mandatory protocol"
   assert.equal(state.phase, "activating");
   assert.match(message, /RESEARCH_ACTIVATION_REQUIRED/);
   assert.match(message, /Call init_goal/);
-  assert.equal(shouldAutoResumeAfterTurn(state, options), true);
+  assert.equal(shouldResearchAutoResumeAfterTurn(state, options), true);
 });
 
 test("existing goal files without config enter needs_init", () => {
-  const state = createLoopControllerState();
-  const message = activateLoop(state, {
+  const state = createResearchPhaseState();
+  const message = activateResearch(state, {
     userGoal: "resume",
     hasRules: true,
     hasConfig: false,
@@ -49,24 +49,24 @@ test("existing goal files without config enter needs_init", () => {
   assert.equal(state.phase, "needs_init");
   assert.match(message, /Read goal\.md, then call init_goal/);
   assert.equal(detectPhaseFromFiles({ hasRules: true, hasConfig: false, hasBenchmarkScript: true }), "needs_init");
-  assert.match(composeResumeMessage(state, options), /RESEARCH_INIT_REQUIRED/);
+  assert.match(composeResearchPhaseResumeMessage(state, options), /RESEARCH_INIT_REQUIRED/);
 });
 
 test("init_goal transitions to mandatory baseline phase", () => {
-  const state = createLoopControllerState();
+  const state = createResearchPhaseState();
 
-  onInitExperiment(state);
+  onResearchInitialized(state);
 
   assert.equal(state.mode, true);
   assert.equal(state.phase, "needs_baseline");
-  assert.equal(shouldAutoResumeAfterTurn(state, options), true);
-  assert.match(composeResumeMessage(state, options), /RESEARCH_BASELINE_REQUIRED/);
+  assert.equal(shouldResearchAutoResumeAfterTurn(state, options), true);
+  assert.match(composeResearchPhaseResumeMessage(state, options), /RESEARCH_BASELINE_REQUIRED/);
 });
 
 test("run_goal transitions to awaiting_log and blocks another run", () => {
-  const state = createLoopControllerState();
+  const state = createResearchPhaseState();
 
-  onRunExperimentFinished(state, {
+  onResearchRunFinished(state, {
     command: "bash goal.sh",
     passed: true,
     crashed: false,
@@ -80,16 +80,16 @@ test("run_goal transitions to awaiting_log and blocks another run", () => {
   });
 
   assert.equal(state.phase, "awaiting_log");
-  assert.equal(shouldAutoResumeAfterTurn(state, options), true);
-  assert.equal(shouldBlockRunExperiment(state), true);
-  assert.match(awaitingLogBlockMessage(state), /Previous run_goal has not been logged/);
-  assert.match(awaitingLogBlockMessage(state), /status: "checks_failed"/);
-  assert.match(awaitingLogBlockMessage(state), /metric: 123/);
+  assert.equal(shouldResearchAutoResumeAfterTurn(state, options), true);
+  assert.equal(shouldBlockResearchRun(state), true);
+  assert.match(researchAwaitingLogBlockMessage(state), /Previous run_goal has not been logged/);
+  assert.match(researchAwaitingLogBlockMessage(state), /status: "checks_failed"/);
+  assert.match(researchAwaitingLogBlockMessage(state), /metric: 123/);
 });
 
 test("log_goal transitions from awaiting_log to looping or limit reached", () => {
-  const state = createLoopControllerState();
-  onRunExperimentFinished(state, {
+  const state = createResearchPhaseState();
+  onResearchRunFinished(state, {
     command: "bash goal.sh",
     passed: true,
     crashed: false,
@@ -102,22 +102,22 @@ test("log_goal transitions from awaiting_log to looping or limit reached", () =>
     metricUnit: "ms",
   });
 
-  onLogExperiment(state, false);
+  onResearchRunLogged(state, false);
   assert.equal(state.phase, "looping");
   assert.equal(state.mode, true);
   assert.equal(state.lastRun, null);
-  assert.equal(shouldAutoResumeAfterTurn(state, options), true);
+  assert.equal(shouldResearchAutoResumeAfterTurn(state, options), true);
 
-  onLogExperiment(state, true);
+  onResearchRunLogged(state, true);
   assert.equal(state.phase, "limit_reached");
   assert.equal(state.mode, false);
 });
 
 test("system prompt injects phase-specific required action", () => {
-  const state = createLoopControllerState();
-  onInitExperiment(state);
+  const state = createResearchPhaseState();
+  onResearchInitialized(state);
 
-  const prompt = systemPromptFor(state, {
+  const prompt = researchPhaseSystemPromptFor(state, {
     hasRules: true,
     hasConfig: true,
     hasBenchmarkScript: true,

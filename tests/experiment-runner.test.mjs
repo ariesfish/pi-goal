@@ -8,7 +8,7 @@ import {
   isGoalShCommand,
   parseMetricLines,
   runExperiment,
-} from "../extensions/pi-goal/experiment-runner.ts";
+} from "../extensions/pi-goal/execution/experiment-runner.ts";
 
 test("parseMetricLines accepts finite metric values and rejects pollution keys", () => {
   const metrics = parseMetricLines([

@@ -4,8 +4,8 @@ import * as path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-import { validateResearch } from "../extensions/pi-goal/research-validator.ts";
-import { ensureActiveResearchDirectory } from "../extensions/pi-goal/research-directory.ts";
+import { validateResearch } from "../extensions/pi-goal/support/research-validator.ts";
+import { ensureActiveResearchDirectory } from "../extensions/pi-goal/persistence/research-directory.ts";
 
 function writeResearchFiles(projectDir, metricName = "total_ms") {
   const researchDir = ensureActiveResearchDirectory(projectDir);

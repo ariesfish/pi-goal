@@ -4,7 +4,7 @@ import * as path from "node:path";
 import test from "node:test";
 import { tmpdir } from "node:os";
 
-import { appendHookLogEntryIfConfigured } from "../extensions/pi-goal/hooks.ts";
+import { appendHookLogEntryIfConfigured } from "../extensions/pi-goal/execution/hooks.ts";
 import {
   extractResearchName,
   hasResearchConfigHeader,
@@ -12,7 +12,7 @@ import {
   isRunResultEntry,
   parseJournalEntry,
   reconstructResearchStateFromJournal,
-} from "../extensions/pi-goal/research-journal.ts";
+} from "../extensions/pi-goal/persistence/research-journal.ts";
 
 test("hook entries are skipped when identifying run entries", () => {
   const hookEntry = parseJournalEntry('{"type":"hook","stage":"before","exit_code":0}');

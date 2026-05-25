@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { LogParams } from "../extensions/pi-goal/schema.ts";
+import { LogParams } from "../extensions/pi-goal/support/schema.ts";
 
 function collectKeyPaths(value, targetKey, path = "$", hits = []) {
   if (Array.isArray(value)) {

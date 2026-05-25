@@ -11,7 +11,7 @@ import {
   findBaselineSecondary,
   findBestMetric,
   registerSecondaryMetrics,
-} from "../extensions/pi-goal/research-state.ts";
+} from "../extensions/pi-goal/domain/research-state.ts";
 
 function run(overrides) {
   return {

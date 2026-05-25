@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-import { readConfig, resolveWorkDir, validateWorkDir } from "../extensions/pi-goal/config.ts";
+import { readConfig, resolveWorkDir, validateWorkDir } from "../extensions/pi-goal/persistence/goal-config.ts";
 
 test("readConfig reports malformed config instead of silently falling back", () => {
   const dir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-config-"));

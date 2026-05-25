@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../extensions/pi-goal/experiment-workspace.ts";
+import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../extensions/pi-goal/workspace/experiment-workspace.ts";
 
 test("dirty tree check separates research state from user changes", async () => {
   const check = await checkResearchWorkspace({
