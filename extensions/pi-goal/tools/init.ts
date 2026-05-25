@@ -2,14 +2,14 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import { Text } from "@mariozechner/pi-tui";
 import * as fs from "node:fs";
 
-import { readRunLimit, resolveWorkDir, validateWorkDir } from "../config.ts";
-import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../experiment-workspace.ts";
-import type { HookPayload, ResearchSnapshot } from "../hooks.ts";
-import { onInitExperiment as controllerOnInitExperiment } from "../loop-controller.ts";
-import { ensureResearchJournalPath } from "../paths.ts";
-import type { SessionRuntime } from "../runtime.ts";
-import { InitParams } from "../schema.ts";
-import { cloneResearchState, type ResearchState } from "../research-state.ts";
+import { readRunLimit, resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
+import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/experiment-workspace.ts";
+import type { HookPayload, ResearchSnapshot } from "../execution/hooks.ts";
+import { onResearchInitialized as controllerOnInitExperiment } from "../protocol/research-phase.ts";
+import { ensureResearchJournalPath } from "../persistence/research-paths.ts";
+import type { SessionRuntime } from "../support/runtime.ts";
+import { InitParams } from "../support/schema.ts";
+import { cloneResearchState, type ResearchState } from "../domain/research-state.ts";
 
 export interface InitExperimentToolDeps {
   getRuntime(ctx: ExtensionContext): SessionRuntime;
@@ -99,6 +99,16 @@ function registerExperimentConfigTool(
         };
       }
 
+      const workDir = resolveWorkDir(ctx.cwd);
+      const dirtyCheck = await checkResearchWorkspace(pi, workDir);
+      const dirtyBlock = formatWorkspaceSafetyError(dirtyCheck);
+      if (dirtyBlock) {
+        return {
+          content: [{ type: "text", text: `❌ ${dirtyBlock}` }],
+          details: {},
+        };
+      }
+
       state.name = params.name;
       state.metricName = params.metric_name;
       state.metricUnit = params.metric_unit ?? "";
@@ -113,7 +123,6 @@ function registerExperimentConfigTool(
       state.confidence = null;
       state.runLimit = readRunLimit(ctx.cwd);
 
-      const workDir = resolveWorkDir(ctx.cwd);
       try {
         const jsonlPath = ensureResearchJournalPath(workDir);
         const config = JSON.stringify({
@@ -135,15 +144,6 @@ function registerExperimentConfigTool(
             type: "text",
             text: `⚠️ Failed to write goal.jsonl: ${e instanceof Error ? e.message : String(e)}`,
           }],
-          details: {},
-        };
-      }
-
-      const dirtyCheck = await checkResearchWorkspace(pi, workDir);
-      const dirtyBlock = formatWorkspaceSafetyError(dirtyCheck);
-      if (dirtyBlock) {
-        return {
-          content: [{ type: "text", text: `❌ ${dirtyBlock}` }],
           details: {},
         };
       }

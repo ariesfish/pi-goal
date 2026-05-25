@@ -1,27 +1,17 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
-import * as fs from "node:fs";
-
-import { resolveWorkDir, validateWorkDir } from "../config.ts";
-import { formatMetricValue } from "../format.ts";
-import type { HookPayload, ResearchSnapshot } from "../hooks.ts";
-import { onLogExperiment as controllerOnLogExperiment } from "../loop-controller.ts";
-import { researchJournalPath } from "../paths.ts";
-import type { SessionRuntime, LogDetails } from "../runtime.ts";
-import { LogParams } from "../schema.ts";
+import { resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
+import { formatMetricValue } from "../ui/metric-format.ts";
+import type { HookPayload, ResearchSnapshot } from "../execution/hooks.ts";
+import { onResearchRunLogged as controllerOnLogExperiment } from "../protocol/research-phase.ts";
+import type { SessionRuntime, LogDetails } from "../support/runtime.ts";
+import { LogParams } from "../support/schema.ts";
 import {
   cloneResearchState,
-  computeConfidence,
-  currentRuns,
-  findBaselineMetric,
-  findBaselineSecondary,
   isBetter,
-  registerSecondaryMetrics,
-  type ASI,
   type ResearchState,
-  type RunResult,
-} from "../research-state.ts";
-import { commitKeptExperiment, revertRejectedExperiment } from "../experiment-workspace.ts";
+} from "../domain/research-state.ts";
+import { logRunResult } from "../run-logging.ts";
 
 export interface LogExperimentToolDeps {
   getRuntime(ctx: ExtensionContext): SessionRuntime;
@@ -67,201 +57,37 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
       };
     }
     const workDir = resolveWorkDir(ctx.cwd);
-    const secondaryMetrics = params.metrics ?? {};
+    const result = await logRunResult(params, {
+      pi,
+      workDir,
+      state,
+      lastRunChecks: runtime.lastRunChecks,
+      wallClockSeconds: runtime.lastRunDuration,
+      fireHook: deps.fireHook,
+      buildResearchSnapshot: deps.buildResearchSnapshot,
+      broadcastDashboardUpdate: deps.broadcastDashboardUpdate,
+    });
 
-    // Gate: prevent "keep" when last run's checks failed
-    if (params.status === "keep" && runtime.lastRunChecks && !runtime.lastRunChecks.pass) {
+    if (!result.ok) {
       return {
-        content: [{
-          type: "text",
-          text: `❌ Cannot keep — goal.checks.sh failed.\n\n${runtime.lastRunChecks.output.slice(-500)}\n\nLog as 'checks_failed' instead. The benchmark metric is valid but correctness checks did not pass.`,
-        }],
+        content: [{ type: "text", text: result.text }],
         details: {},
       };
     }
 
-    // Validate secondary metrics consistency (after first experiment establishes them)
-    if (state.secondaryMetrics.length > 0) {
-      const knownNames = new Set(state.secondaryMetrics.map((m) => m.name));
-      const providedNames = new Set(Object.keys(secondaryMetrics));
+    let text = result.text;
+    if (result.afterSteer) pi.sendUserMessage(result.afterSteer, { deliverAs: "steer" });
 
-      // Check for missing metrics
-      const missing = [...knownNames].filter((n) => !providedNames.has(n));
-      if (missing.length > 0) {
-        return {
-          content: [{
-            type: "text",
-            text: `❌ Missing secondary metrics: ${missing.join(", ")}\n\nYou must provide all previously tracked metrics. Expected: ${[...knownNames].join(", ")}\nGot: ${[...providedNames].join(", ") || "(none)"}\n\nFix: include ${missing.map((m) => `"${m}": <value>`).join(", ")} in the metrics parameter.`,
-          }],
-          details: {},
-        };
-      }
-
-      // Check for new metrics not yet tracked
-      const newMetrics = [...providedNames].filter((n) => !knownNames.has(n));
-      if (newMetrics.length > 0 && !params.force) {
-        return {
-          content: [{
-            type: "text",
-            text: `❌ New secondary metric${newMetrics.length > 1 ? "s" : ""} not previously tracked: ${newMetrics.join(", ")}\n\nExisting metrics: ${[...knownNames].join(", ")}\n\nIf this metric has proven very valuable to watch, call log_goal again with force: true to add it. Otherwise, remove it from the metrics parameter.`,
-          }],
-          details: {},
-        };
-      }
-    }
-
-    // ASI: agent-supplied free-form diagnostics
-    const mergedASI = (params.asi && Object.keys(params.asi).length > 0)
-      ? params.asi as ASI
-      : undefined;
-
-    const runResult: RunResult = {
-      commit: params.commit.slice(0, 7),
-      metric: params.metric,
-      metrics: secondaryMetrics,
-      status: params.status,
-      description: params.description,
-      timestamp: Date.now(),
-      experimentIndex: state.currentExperimentIndex,
-      confidence: null,
-      asi: mergedASI,
-    };
-
-    state.results.push(runResult);
-
-    registerSecondaryMetrics(state, secondaryMetrics);
-
-    // Baseline = first run in current experiment
-    state.bestMetric = findBaselineMetric(state.results, state.currentExperimentIndex);
-
-    // Compute confidence score (best improvement as multiple of noise floor)
-    state.confidence = computeConfidence(state.results, state.currentExperimentIndex, state.bestDirection);
-    runResult.confidence = state.confidence;
-
-    // Build response text
-    const runCount = currentRuns(state.results, state.currentExperimentIndex).length;
-    let text = `Logged #${state.results.length}: ${runResult.status} — ${runResult.description}`;
-
-    if (state.bestMetric !== null) {
-      text += `\nBaseline ${state.metricName}: ${formatMetricValue(state.bestMetric, state.metricUnit)}`;
-      if (runCount > 1 && params.status === "keep" && params.metric > 0) {
-        const delta = params.metric - state.bestMetric;
-        const pct = ((delta / state.bestMetric) * 100).toFixed(1);
-        const sign = delta > 0 ? "+" : "";
-        text += ` | this: ${formatMetricValue(params.metric, state.metricUnit)} (${sign}${pct}%)`;
-      }
-    }
-
-    // Show secondary metrics
-    if (Object.keys(secondaryMetrics).length > 0) {
-      const baselines = findBaselineSecondary(state.results, state.currentExperimentIndex, state.secondaryMetrics);
-      const parts: string[] = [];
-      for (const [name, value] of Object.entries(secondaryMetrics)) {
-        const def = state.secondaryMetrics.find((m) => m.name === name);
-        const unit = def?.unit ?? "";
-        let part = `${name}: ${formatMetricValue(value, unit)}`;
-        const bv = baselines[name];
-        if (bv !== undefined && state.results.length > 1 && bv !== 0) {
-          const d = value - bv;
-          const p = ((d / bv) * 100).toFixed(1);
-          const s = d > 0 ? "+" : "";
-          part += ` (${s}${p}%)`;
-        }
-        parts.push(part);
-      }
-      text += `\nSecondary: ${parts.join("  ")}`;
-    }
-
-    // Show ASI summary
-    if (mergedASI) {
-      const asiParts: string[] = [];
-      for (const [k, v] of Object.entries(mergedASI)) {
-        const s = typeof v === "string" ? v : JSON.stringify(v);
-        asiParts.push(`${k}: ${s.length > 80 ? s.slice(0, 77) + "…" : s}`);
-      }
-      if (asiParts.length > 0) {
-        text += `\n📋 ASI: ${asiParts.join(" | ")}`;
-      }
-    }
-
-    // Show confidence score
-    if (state.confidence !== null) {
-      const confStr = state.confidence.toFixed(1);
-      if (state.confidence >= 2.0) {
-        text += `\n📊 Confidence: ${confStr}× noise floor — improvement is likely real`;
-      } else if (state.confidence >= 1.0) {
-        text += `\n📊 Confidence: ${confStr}× noise floor — improvement is above noise but marginal`;
-      } else {
-        text += `\n⚠️ Confidence: ${confStr}× noise floor — improvement is within noise. Consider re-running to confirm before keeping.`;
-      }
-    }
-
-    text += `\n(${runCount} runs in current experiment`;
-    if (state.runLimit !== null) {
-      text += ` / ${state.runLimit} max`;
-    }
-    text += `)`;
-
-    // Auto-commit only on keep — discards/crashes get reverted anyway
-    if (params.status === "keep") {
-      const keepResult = await commitKeptExperiment({
-        pi,
-        workDir,
-        description: params.description,
-        metricName: state.metricName,
-        metric: params.metric,
-        status: params.status,
-        secondaryMetrics,
-      });
-      text += keepResult.text;
-      if (keepResult.commit) runResult.commit = keepResult.commit;
-    }
-
-    const jsonlEntry: Record<string, unknown> = {
-      run: state.results.length,
-      ...runResult,
-    };
-    if (!mergedASI) delete jsonlEntry.asi;
-    const jsonlLine = JSON.stringify(jsonlEntry);
-
-    try {
-      fs.appendFileSync(researchJournalPath(workDir), jsonlLine + "\n");
-      deps.broadcastDashboardUpdate(workDir);
-    } catch (e) {
-      text += `\n⚠️ Failed to write goal.jsonl: ${e instanceof Error ? e.message : String(e)}`;
-    }
-
-    if (params.status !== "keep") {
-      text += await revertRejectedExperiment({ pi, workDir, status: params.status });
-    }
-
-    const afterSteer = await deps.fireHook({
-      event: "after",
-      cwd: workDir,
-      run_entry: jsonlEntry,
-      research: deps.buildResearchSnapshot(state),
-    });
-    if (afterSteer) pi.sendUserMessage(afterSteer, { deliverAs: "steer" });
-
-    const wallClockSeconds = runtime.lastRunDuration;
     runtime.activeRun = null;
     runtime.lastRunChecks = null;
     runtime.lastRunDuration = null;
 
-    const limitReached = state.runLimit !== null && runCount >= state.runLimit;
-    controllerOnLogExperiment(runtime.loop, limitReached);
-    if (limitReached) {
+    controllerOnLogExperiment(runtime.loop, result.limitReached);
+    if (result.limitReached) {
       text += `\n\n🛑 Maximum runs reached (${state.runLimit}) for the current experiment. STOP the research loop now.`;
       ctx.abort();
-    } else if (runtime.loop.mode) {
-      const beforeSteer = await deps.fireHook({
-        event: "before",
-        cwd: workDir,
-        next_run: state.results.length + 1,
-        last_run: jsonlEntry,
-        research: deps.buildResearchSnapshot(state),
-      });
-      if (beforeSteer) pi.sendUserMessage(beforeSteer, { deliverAs: "steer" });
+    } else if (runtime.loop.mode && result.beforeSteer) {
+      pi.sendUserMessage(result.beforeSteer, { deliverAs: "steer" });
     }
 
     deps.updateWidget(ctx);
@@ -272,9 +98,9 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
     return {
       content: [{ type: "text", text }],
       details: {
-        runResult: { ...runResult, metrics: { ...runResult.metrics } },
+        runResult: { ...result.runResult, metrics: { ...result.runResult.metrics } },
         state: cloneResearchState(state),
-        wallClockSeconds,
+        wallClockSeconds: result.wallClockSeconds,
       } as LogDetails,
     };
   },

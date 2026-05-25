@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { hasResearchConfigHeader } from "./research-journal.ts";
+import { hasResearchConfigHeader } from "../persistence/research-journal.ts";
 
 const TIMEOUT_MS = 30_000;
 const STDOUT_MAX_BYTES = 8 * 1024;

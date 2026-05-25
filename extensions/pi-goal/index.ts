@@ -16,73 +16,59 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
-  SessionBeforeCompactEvent,
 } from "@mariozechner/pi-coding-agent";
 import * as fs from "node:fs";
-import * as path from "node:path";
-
 import {
   runHook,
   steerMessageFor,
   appendHookLogEntryIfConfigured,
   type HookPayload,
-  type ResearchSnapshot,
-} from "./hooks.ts";
-import {
-  parseJournalEntry,
-  isRunResultEntry,
-  reconstructResearchStateFromJournal,
-} from "./research-journal.ts";
+} from "./execution/hooks.ts";
 import {
   cloneResearchState,
   createResearchState,
   computeConfidence,
-  findBaselineMetric,
-  findBestMetric,
-  type ResearchState,
-} from "./research-state.ts";
+} from "./domain/research-state.ts";
 import {
-  activateLoop,
-  clearLoop,
-  composeCompactionResumeMessage as composeControllerCompactionResumeMessage,
-  composeResumeMessage as composeControllerResumeMessage,
-  deactivateLoop,
-  detectPhaseFromFiles,
-  enterLoopingFromPersistedLog,
-  resetLoopForAgentStart,
-  shouldAutoResumeAfterCompact as controllerShouldAutoResumeAfterCompact,
-  shouldAutoResumeAfterTurn as controllerShouldAutoResumeAfterTurn,
-  systemPromptFor as controllerSystemPromptFor,
-  type LoopControllerOptions,
-} from "./loop-controller.ts";
-import {
-  researchSummaryPathsFor,
-  buildResearchCompactionSummary,
-} from "./compaction.ts";
-import { resolveGoalShortcuts } from "./shortcuts.ts";
-import { readRunLimit, resolveWorkDir, validateWorkDir } from "./config.ts";
-import { activeResearchPath, ensureActiveResearchDirectory, sanitizeResearchId } from "./research-directory.ts";
-import { checkResearchWorkspace, formatWorkspaceSafetyError } from "./experiment-workspace.ts";
-import {
-  researchChecksPath,
-  researchIdeasPath,
-  researchJournalPath,
-  researchRulesPath,
-  researchScriptPath,
-} from "./paths.ts";
+  clearResearchPhase,
+  deactivateResearch,
+  resetResearchPhaseForAgentStart,
+  type ResearchProtocolOptions,
+} from "./protocol/research-phase.ts";
+import { resolveGoalShortcuts } from "./support/shortcuts.ts";
+import { readRunLimit, resolveWorkDir, validateWorkDir } from "./persistence/goal-config.ts";
+
+import { checkResearchWorkspace, formatWorkspaceSafetyError } from "./workspace/experiment-workspace.ts";
+import { researchJournalPath } from "./persistence/research-paths.ts";
 import {
   createRuntimeStore,
   type SessionRuntime,
   type LogDetails,
-} from "./runtime.ts";
-import { createDashboardServer } from "./dashboard-server.ts";
-import { createDashboardOverlayController } from "./dashboard-overlay.ts";
-import { createWidgetController } from "./widget.ts";
-import { createResumeAdapter } from "./resume-adapter.ts";
+} from "./support/runtime.ts";
+import { createDashboardServer } from "./ui/browser-dashboard.ts";
+import { createDashboardOverlayController } from "./ui/dashboard-overlay.ts";
+import { createWidgetController } from "./ui/widget.ts";
+import { createResumeAdapter } from "./protocol/resume-scheduler.ts";
 import { registerValidateResearchTool } from "./tools/validate.ts";
 import { registerInitExperimentTool, registerStartExperimentTool } from "./tools/init.ts";
 import { registerRunExperimentTool } from "./tools/run.ts";
 import { registerLogExperimentTool } from "./tools/log.ts";
+import {
+  buildResearchSnapshot,
+  hydrateResearchStateFromJournal,
+  readLastRunResult,
+  selectActiveResearch,
+} from "./persistence/research-store.ts";
+import { readResearchFileContract } from "./persistence/research-files.ts";
+import {
+  composeResearchCompactionResumeMessage,
+  composeResearchResumeMessage,
+  composeResearchSystemPrompt,
+  shouldResumeResearchAfterCompact,
+  shouldResumeResearchAfterTurn,
+  startResearchActivation,
+  syncResearchPhaseFromResearchFiles,
+} from "./protocol/research-protocol.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -98,7 +84,7 @@ export default function goalExtension(pi: ExtensionAPI) {
   const MAX_ACTIVATION_TURNS = 3;
   const BENCHMARK_GUARDRAIL =
     "Be careful not to overfit to the benchmarks and do not cheat on the benchmarks.";
-  const loopOptions: LoopControllerOptions = {
+  const loopOptions: ResearchProtocolOptions = {
     maxAutoResumeTurns: MAX_AUTORESUME_TURNS,
     maxActivationTurns: MAX_ACTIVATION_TURNS,
     benchmarkGuardrail: BENCHMARK_GUARDRAIL,
@@ -133,11 +119,11 @@ export default function goalExtension(pi: ExtensionAPI) {
   const getRuntime = (ctx: ExtensionContext): SessionRuntime =>
     runtimeStore.ensure(getSessionKey(ctx));
 
-  const shouldAutoResumeAfterTurn = (runtime: SessionRuntime): boolean =>
-    controllerShouldAutoResumeAfterTurn(runtime.loop, loopOptions);
+  const shouldResearchAutoResumeAfterTurn = (runtime: SessionRuntime): boolean =>
+    shouldResumeResearchAfterTurn(runtime, loopOptions);
 
-  const shouldAutoResumeAfterCompact = (runtime: SessionRuntime): boolean =>
-    controllerShouldAutoResumeAfterCompact(runtime.loop);
+  const shouldResearchAutoResumeAfterCompact = (runtime: SessionRuntime): boolean =>
+    shouldResumeResearchAfterCompact(runtime);
 
   const notifyAutoResumeLimitReached = (ctx: ExtensionContext): void => {
     ctx.ui.notify(
@@ -146,47 +132,21 @@ export default function goalExtension(pi: ExtensionAPI) {
     );
   };
 
-  const composeResumeMessage = (_ctx: ExtensionContext): string =>
-    composeControllerResumeMessage(getRuntime(_ctx).loop, loopOptions);
+  const composeResearchPhaseResumeMessage = (_ctx: ExtensionContext): string =>
+    composeResearchResumeMessage(getRuntime(_ctx), loopOptions);
 
-  const composeCompactionResumeMessage = (_ctx: ExtensionContext): string =>
-    composeControllerCompactionResumeMessage(loopOptions);
+  const composeResearchPhaseCompactionResumeMessage = (_ctx: ExtensionContext): string =>
+    composeResearchCompactionResumeMessage(loopOptions);
 
   const resume = createResumeAdapter({
     pi,
     loopOptions,
     settledWindowMs: SETTLED_WINDOW_MS,
     notifyAutoResumeLimitReached,
-    composeResumeMessage,
+    composeResearchPhaseResumeMessage,
   });
 
-  const hasResearchRules = (ctx: ExtensionContext): boolean =>
-    fs.existsSync(researchRulesPath(resolveWorkDir(ctx.cwd)));
-
-  const readJsonlLines = (workDir: string): string[] => {
-    const jsonlPath = researchJournalPath(workDir);
-    if (!fs.existsSync(jsonlPath)) return [];
-    return fs.readFileSync(jsonlPath, "utf-8").split("\n").filter(Boolean);
-  };
-
-  const readLastRun = (workDir: string): Record<string, unknown> | null => {
-    const lines = readJsonlLines(workDir);
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const entry = parseJournalEntry(lines[i]);
-      if (isRunResultEntry(entry)) return entry;
-    }
-    return null;
-  };
-
-  const buildResearchSnapshot = (state: ResearchState): ResearchSnapshot => ({
-    metric_name: state.metricName,
-    metric_unit: state.metricUnit,
-    direction: state.bestDirection,
-    baseline_metric: state.bestMetric,
-    best_metric: findBestMetric(state.results, state.currentExperimentIndex, state.bestDirection),
-    run_count: state.results.length,
-    goal: state.name ?? "",
-  });
+  const readLastRun = readLastRunResult;
 
   const fireHook = async (payload: HookPayload): Promise<string | null> => {
     const result = await runHook(payload);
@@ -235,7 +195,7 @@ export default function goalExtension(pi: ExtensionAPI) {
     runtime.lastRunChecks = null;
     runtime.lastRunDuration = null;
     runtime.activeRun = null;
-    resetLoopForAgentStart(runtime.loop);
+    resetResearchPhaseForAgentStart(runtime.loop);
     runtime.loop.autoResumeTurns = 0;
     runtime.loop.activationTurns = 0;
     runtime.state = createResearchState();
@@ -250,23 +210,7 @@ export default function goalExtension(pi: ExtensionAPI) {
     let loadedFromJsonl = false;
     try {
       if (fs.existsSync(jsonlPath)) {
-        const reconstructed = reconstructResearchStateFromJournal(fs.readFileSync(jsonlPath, "utf-8"));
-        state.name = reconstructed.name;
-        state.metricName = reconstructed.metricName;
-        state.metricUnit = reconstructed.metricUnit;
-        state.bestDirection = reconstructed.bestDirection;
-        state.currentExperimentIndex = reconstructed.currentExperimentIndex;
-        state.results = reconstructed.results.map((result) => ({
-          ...result,
-          metrics: { ...result.metrics },
-        }));
-        state.secondaryMetrics = reconstructed.secondaryMetrics.map((metric) => ({ ...metric }));
-
-        if (state.results.length > 0) {
-          loadedFromJsonl = true;
-          state.bestMetric = findBaselineMetric(state.results, state.currentExperimentIndex);
-          state.confidence = computeConfidence(state.results, state.currentExperimentIndex, state.bestDirection);
-        }
+        loadedFromJsonl = hydrateResearchStateFromJournal(state, fs.readFileSync(jsonlPath, "utf-8"));
       }
     } catch {
       // Fall through to session history
@@ -302,24 +246,10 @@ export default function goalExtension(pi: ExtensionAPI) {
     // Read max experiments from config file
     state.runLimit = readRunLimit(ctx.cwd);
 
-    // Auto-enter goal mode when a persisted experiment log exists.
+    // Auto-enter goal mode when a persisted research journal exists.
     // If a skill created goal.md + goal.sh but did not initialize,
     // enter needs_init so the extension can push the agent across the seam.
-    if (fs.existsSync(researchJournalPath(workDir))) {
-      enterLoopingFromPersistedLog(runtime.loop);
-    } else {
-      const phase = detectPhaseFromFiles({
-        hasRules: fs.existsSync(researchRulesPath(workDir)),
-        hasConfig: false,
-        hasBenchmarkScript: fs.existsSync(researchScriptPath(workDir)),
-      });
-      if (phase === "needs_init") {
-        runtime.loop.mode = true;
-        runtime.loop.phase = "needs_init";
-      } else {
-        deactivateLoop(runtime.loop);
-      }
-    }
+    syncResearchPhaseFromResearchFiles(runtime.loop, readResearchFileContract(workDir));
 
     updateWidget(ctx);
   };
@@ -340,25 +270,24 @@ export default function goalExtension(pi: ExtensionAPI) {
 
   pi.on("agent_start", async (_event, ctx) => {
     const runtime = getRuntime(ctx);
-    resetLoopForAgentStart(runtime.loop);
+    resetResearchPhaseForAgentStart(runtime.loop);
     resume.pause(runtime);
   });
 
 
-  pi.on("session_before_compact", async (event, ctx) => {
+  pi.on("session_before_compact", async (_event, ctx) => {
     resume.pause(getRuntime(ctx));
-    return goalCompactionFor(ctx, event);
   });
 
   pi.on("session_compact", async (_event, ctx) => {
-    resume.ensure(ctx, getRuntime(ctx), shouldAutoResumeAfterCompact, composeCompactionResumeMessage);
+    resume.ensure(ctx, getRuntime(ctx), shouldResearchAutoResumeAfterCompact, composeResearchPhaseCompactionResumeMessage);
   });
 
   pi.on("agent_end", async (_event, ctx) => {
     const runtime = getRuntime(ctx);
     runtime.activeRun = null;
     dashboardOverlay.requestRender();
-    resume.ensure(ctx, runtime, shouldAutoResumeAfterTurn);
+    resume.ensure(ctx, runtime, shouldResearchAutoResumeAfterTurn);
   });
 
   // When in goal mode, add phase-specific loop control to the system prompt.
@@ -366,29 +295,11 @@ export default function goalExtension(pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event, ctx) => {
     const runtime = getRuntime(ctx);
     const workDir = resolveWorkDir(ctx.cwd);
-    const mdPath = researchRulesPath(workDir);
-    const ideasPath = researchIdeasPath(workDir);
-    const checksPath = researchChecksPath(workDir);
-    const jsonlPath = researchJournalPath(workDir);
-    const hasRules = fs.existsSync(mdPath);
-    const hasBenchmarkScript = fs.existsSync(researchScriptPath(workDir));
-    const hasConfig = fs.existsSync(jsonlPath);
-
-    if (!runtime.loop.mode && hasRules && hasBenchmarkScript && !hasConfig) {
-      runtime.loop.mode = true;
-      runtime.loop.phase = "needs_init";
-    }
-
-    const extra = controllerSystemPromptFor(runtime.loop, {
-      hasRules,
-      hasConfig,
-      hasBenchmarkScript,
-      hasIdeas: fs.existsSync(ideasPath),
-      hasChecks: fs.existsSync(checksPath),
-      mdPath,
-      ideasPath,
-      checksPath,
-    }, loopOptions);
+    const extra = composeResearchSystemPrompt(
+      runtime.loop,
+      readResearchFileContract(workDir),
+      loopOptions,
+    );
 
     if (!extra) return;
     return {
@@ -445,13 +356,13 @@ export default function goalExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   if (shortcuts.toggleDashboard) {
-    pi.registerShortcut(shortcuts.toggleDashboard, {
+    pi.registerShortcut(shortcuts.toggleDashboard as any, {
       description: "Toggle goal dashboard",
       handler: async (ctx) => {
         const runtime = getRuntime(ctx);
         const state = runtime.state;
         if (state.results.length === 0) {
-          if (!runtime.loop.mode && !fs.existsSync(researchRulesPath(resolveWorkDir(ctx.cwd)))) {
+          if (!runtime.loop.mode && !readResearchFileContract(resolveWorkDir(ctx.cwd)).hasRules) {
             ctx.ui.notify("No runs yet — run /goal to get started", "info");
           } else {
             ctx.ui.notify("No runs yet", "info");
@@ -469,7 +380,7 @@ export default function goalExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   if (shortcuts.fullscreenDashboard) {
-    pi.registerShortcut(shortcuts.fullscreenDashboard, {
+    pi.registerShortcut(shortcuts.fullscreenDashboard as any, {
       description: "Fullscreen goal dashboard",
       handler: async (ctx) => {
         const runtime = getRuntime(ctx);
@@ -507,7 +418,7 @@ export default function goalExtension(pi: ExtensionAPI) {
       if (command === "off") {
         const wasRunning = !ctx.isIdle();
 
-        deactivateLoop(runtime.loop);
+        deactivateResearch(runtime.loop);
         runtime.dashboardExpanded = false;
         runtime.lastRunChecks = null;
         runtime.lastRunDuration = null;
@@ -545,11 +456,9 @@ export default function goalExtension(pi: ExtensionAPI) {
           return;
         }
         const workDir = resolveWorkDir(ctx.cwd);
-        fs.mkdirSync(path.dirname(activeResearchPath(workDir)), { recursive: true });
-        fs.writeFileSync(activeResearchPath(workDir), sanitizeResearchId(researchId) + "\n");
-        ensureActiveResearchDirectory(workDir);
+        const selectedResearchId = selectActiveResearch(workDir, researchId);
         reconstructState(ctx);
-        ctx.ui.notify(`Active research selected: ${sanitizeResearchId(researchId)}`, "info");
+        ctx.ui.notify(`Active research selected: ${selectedResearchId}`, "info");
         return;
       }
 
@@ -568,7 +477,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 
       if (command === "clear") {
         const jsonlPath = researchJournalPath(resolveWorkDir(ctx.cwd));
-        clearLoop(runtime.loop);
+        clearResearchPhase(runtime.loop);
         runtime.dashboardExpanded = false;
         runtime.lastRunChecks = null;
         runtime.activeRun = null;
@@ -610,22 +519,14 @@ export default function goalExtension(pi: ExtensionAPI) {
         ctx.ui.notify(dirtyBlock, "error");
         return;
       }
-      const jsonlPath = researchJournalPath(workDir);
-      const rulesLoaded = hasResearchRules(ctx);
-      const hasBenchmarkScript = fs.existsSync(researchScriptPath(workDir));
-      const kickoff = activateLoop(runtime.loop, {
-        userGoal: trimmedArgs,
-        hasRules: rulesLoaded,
-        hasConfig: fs.existsSync(jsonlPath),
-        hasBenchmarkScript,
-      }, loopOptions);
-
-      ctx.ui.notify(
-        rulesLoaded
-          ? "Research mode ON — rules loaded from goal.md"
-          : "Research mode ON — no goal.md found, setting up",
-        "info",
+      const activation = startResearchActivation(
+        runtime.loop,
+        readResearchFileContract(workDir),
+        trimmedArgs,
+        loopOptions,
       );
+
+      ctx.ui.notify(activation.notification, "info");
 
       const state = runtime.state;
       const activationSteer = await fireHook({
@@ -636,7 +537,7 @@ export default function goalExtension(pi: ExtensionAPI) {
         research: buildResearchSnapshot(state),
       });
 
-      resume.sendWhenReady(ctx, activationSteer ? `${activationSteer}\n\n${kickoff}` : kickoff);
+      resume.sendWhenReady(ctx, activationSteer ? `${activationSteer}\n\n${activation.kickoff}` : activation.kickoff);
     },
   });
 }

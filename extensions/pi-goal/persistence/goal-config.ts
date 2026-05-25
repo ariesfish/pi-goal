@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { researchConfigPath } from "./paths.ts";
+import { researchConfigPath } from "./research-paths.ts";
 
 export interface ResearchConfig {
   maxIterations?: number;

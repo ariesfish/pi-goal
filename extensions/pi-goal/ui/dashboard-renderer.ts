@@ -1,69 +1,14 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 
-import { formatMetricValue } from "./format.ts";
+import { appendRightAlignedAdaptiveHint } from "./tui-layout.ts";
+import { formatMetricValue } from "./metric-format.ts";
+import type { ResearchState } from "../domain/research-state.ts";
 import {
-  currentRuns,
-  findBaselineRunNumber,
-  findBaselineSecondary,
-  findBestMetric,
-  isBetter,
-  type ResearchState,
-} from "./research-state.ts";
-
-export function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-export function truncateDisplayText(text: string, width: number): string {
-  if (width <= 0) return "";
-  return truncateToWidth(text, width, "…", true);
-}
-
-export function joinPartsToWidth(parts: string[], width: number): string {
-  let line = "";
-  for (const part of parts) {
-    if (!part) continue;
-    const next = line + part;
-    if (visibleWidth(next) <= width) {
-      line = next;
-      continue;
-    }
-    return truncateToWidth(line || part, width, "…", true);
-  }
-  return truncateToWidth(line, width, "…", true);
-}
-
-export function appendRightAlignedAdaptiveHint(
-  left: string,
-  width: number,
-  theme: Theme,
-  candidates: string[]
-): string {
-  if (width <= 0) return "";
-  const leftWidth = visibleWidth(left);
-  for (const candidate of candidates) {
-    const hint = theme.fg("dim", ` ${candidate}`);
-    const hintWidth = visibleWidth(hint);
-    if (hintWidth > width) continue;
-    if (leftWidth + hintWidth <= width) {
-      return left + " ".repeat(Math.max(0, width - leftWidth - hintWidth)) + hint;
-    }
-    const availableLeftWidth = Math.max(0, width - hintWidth);
-    const truncatedLeft = truncateToWidth(left, availableLeftWidth, "…", true);
-    const truncatedLeftWidth = visibleWidth(truncatedLeft);
-    return truncatedLeft + " ".repeat(Math.max(0, width - truncatedLeftWidth - hintWidth)) + hint;
-  }
-  return truncateToWidth(left, width, "…", true);
-}
-
-export function getTuiSize(tui: { terminal?: { columns?: number; rows?: number } }): { width: number; height: number } {
-  return {
-    width: tui.terminal?.columns ?? process.stdout.columns ?? 120,
-    height: tui.terminal?.rows ?? process.stdout.rows ?? 40,
-  };
-}
-
+  buildResearchSummaryFromState,
+  isBetterMetric,
+  type ResearchRunSummary,
+} from "../domain/research-summary.ts";
 
 // ---------------------------------------------------------------------------
 // Dashboard table renderer (pure function, no UI deps)
@@ -83,31 +28,16 @@ export function renderDashboardLines(
     return lines;
   }
 
-  const cur = currentRuns(st.results, st.currentExperimentIndex);
-  const kept = cur.filter((r) => r.status === "keep").length;
-  const discarded = cur.filter((r) => r.status === "discard").length;
-  const crashed = cur.filter((r) => r.status === "crash").length;
-  const checksFailed = cur.filter((r) => r.status === "checks_failed").length;
+  const summary = buildResearchSummaryFromState(st, { recentRunLimit: st.results.length });
+  const { statusCounts } = summary.currentExperiment;
+  const kept = statusCounts.keep;
+  const discarded = statusCounts.discard;
+  const crashed = statusCounts.crash;
+  const checksFailed = statusCounts.checks_failed;
 
-  const baseline = st.bestMetric;
-  const baselineRunNumber = findBaselineRunNumber(st.results, st.currentExperimentIndex);
-  const baselineSec = findBaselineSecondary(st.results, st.currentExperimentIndex, st.secondaryMetrics);
-
-  // Find best kept primary metric and its run number (current experimentIndex only)
-  let bestPrimary: number | null = null;
-  let bestSecondary: Record<string, number> = {};
-  let bestRunNum = 0;
-  for (let i = st.results.length - 1; i >= 0; i--) {
-    const r = st.results[i];
-    if (r.experimentIndex !== st.currentExperimentIndex) continue;
-    if (r.status === "keep" && r.metric > 0) {
-      if (bestPrimary === null || isBetter(r.metric, bestPrimary, st.bestDirection)) {
-        bestPrimary = r.metric;
-        bestSecondary = r.metrics ?? {};
-        bestRunNum = i + 1;
-      }
-    }
-  }
+  const baseline = summary.currentExperiment.baseline;
+  const baselineSec = summary.currentExperiment.baselineSecondary;
+  const best = summary.currentExperiment.best;
 
   // Runs summary
   const confSuffix = st.confidence !== null
@@ -130,23 +60,23 @@ export function renderDashboardLines(
   );
 
   // Baseline: first run's primary metric
-  const baselineSuffix = baselineRunNumber === null ? "" : ` #${baselineRunNumber}`;
+  const baselineSuffix = baseline === null ? "" : ` #${baseline.runNumber}`;
   lines.push(
     truncateToWidth(
-      `  ${th.fg("muted", "Baseline:")} ${th.fg("muted", `★ ${st.metricName}: ${formatMetricValue(baseline, st.metricUnit)}${baselineSuffix}`)}`,
+      `  ${th.fg("muted", "Baseline:")} ${th.fg("muted", `★ ${st.metricName}: ${formatMetricValue(baseline?.metric ?? null, st.metricUnit)}${baselineSuffix}`)}`,
       width
     )
   );
 
 
   // Progress: best primary metric with delta + run number
-  if (bestPrimary !== null) {
-    let progressLine = `  ${th.fg("muted", "Progress:")} ${th.fg("warning", th.bold(`★ ${st.metricName}: ${formatMetricValue(bestPrimary, st.metricUnit)}`))}${th.fg("dim", ` #${bestRunNum}`)}`;
+  if (best !== null) {
+    let progressLine = `  ${th.fg("muted", "Progress:")} ${th.fg("warning", th.bold(`★ ${st.metricName}: ${formatMetricValue(best.metric, st.metricUnit)}`))}${th.fg("dim", ` #${best.runNumber}`)}`;
 
-    if (baseline !== null && baseline !== 0 && bestPrimary !== baseline) {
-      const pct = ((bestPrimary - baseline) / baseline) * 100;
+    if (best.deltaPercent !== null && baseline !== null) {
+      const pct = best.deltaPercent;
       const sign = pct > 0 ? "+" : "";
-      const color = isBetter(bestPrimary, baseline, st.bestDirection) ? "success" : "error";
+      const color = isBetterMetric(best.metric, baseline.metric, st.bestDirection) ? "success" : "error";
       progressLine += th.fg(color, ` (${sign}${pct.toFixed(1)}%)`);
     }
 
@@ -160,7 +90,7 @@ export function renderDashboardLines(
       // Build individually-colored parts
       const secParts: string[] = [];
       for (const sm of st.secondaryMetrics) {
-        const val = bestSecondary[sm.name];
+        const val = best.metrics[sm.name];
         const bv = baselineSec[sm.name];
         if (val !== undefined) {
           let part = th.fg("muted", `${sm.name}: ${formatMetricValue(val, sm.unit)}`);
@@ -202,11 +132,11 @@ export function renderDashboardLines(
   // Determine visible rows once — used for both column sizing and rendering
   const effectiveMax = maxRows <= 0 ? st.results.length : maxRows;
   const startIdx = Math.max(0, st.results.length - effectiveMax);
-  const rowsToRender = st.results.slice(startIdx);
+  const rowsToRender = summary.recentRuns.slice(-effectiveMax);
 
   // Only show secondary metric columns that have at least one value in rendered rows
   const secMetrics = st.secondaryMetrics.filter((sm) =>
-    rowsToRender.some((r) => (r.metrics ?? {})[sm.name] !== undefined)
+    rowsToRender.some((r) => r.metrics[sm.name] !== undefined)
   );
 
   // Column definitions
@@ -269,13 +199,8 @@ export function renderDashboardLines(
     )
   );
 
-  // Baseline values for delta display (current experimentIndex only)
-  const baselinePrimary = findBaselineMetric(st.results, st.currentExperimentIndex);
-  const baselineSecondary = findBaselineSecondary(
-    st.results,
-    st.currentExperimentIndex,
-    st.secondaryMetrics
-  );
+  const baselinePrimary = baseline?.metric ?? null;
+  const baselineSecondary = baselineSec;
 
   // Show max 6 recent runs, with a note about hidden earlier ones
   if (startIdx > 0) {
@@ -287,12 +212,9 @@ export function renderDashboardLines(
     );
   }
 
-  const baselineIndex = st.results.findIndex((x) => x.experimentIndex === st.currentExperimentIndex);
-
-  for (let i = startIdx; i < st.results.length; i++) {
-    const r = st.results[i];
+  for (const r of rowsToRender) {
     const isOld = r.experimentIndex !== st.currentExperimentIndex;
-    const isBaseline = !isOld && i === baselineIndex;
+    const isBaseline = !isOld && baseline?.runNumber === r.runNumber;
 
     const color = isOld
       ? "dim"
@@ -313,7 +235,7 @@ export function renderDashboardLines(
         r.status === "keep" &&
         r.metric > 0
       ) {
-        if (isBetter(r.metric, baselinePrimary, st.bestDirection)) {
+        if (isBetterMetric(r.metric, baselinePrimary, st.bestDirection)) {
           primaryColor = "success";
         } else if (r.metric !== baselinePrimary) {
           primaryColor = "error";
@@ -321,7 +243,7 @@ export function renderDashboardLines(
       }
     }
 
-    const idxStr = th.fg("dim", String(i + 1).padEnd(col.idx));
+    const idxStr = th.fg("dim", String(r.runNumber).padEnd(col.idx));
     const commitStr = isOld
       ? "(old)".padEnd(col.commit)
       : r.status !== "keep"
@@ -334,7 +256,7 @@ export function renderDashboardLines(
       `${th.fg(primaryColor, isOld ? primaryStr.padEnd(col.primary) : th.bold(primaryStr.padEnd(col.primary)))}`;
 
     // Secondary metrics (only visible columns)
-    const rowMetrics = r.metrics ?? {};
+    const rowMetrics = r.metrics;
     for (let si = 0; si < visibleSecMetrics.length; si++) {
       const sm = visibleSecMetrics[si];
       const colW = secColWidths[si];

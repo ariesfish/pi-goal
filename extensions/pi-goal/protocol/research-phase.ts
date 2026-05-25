@@ -1,4 +1,4 @@
-export type LoopPhase =
+export type ResearchPhase =
   | "inactive"
   | "activating"
   | "needs_init"
@@ -20,9 +20,9 @@ export interface LastRunSummary {
   metricUnit: string;
 }
 
-export interface LoopControllerState {
+export interface ResearchPhaseState {
   mode: boolean;
-  phase: LoopPhase;
+  phase: ResearchPhase;
   activationPrompt: string | null;
   activationTurns: number;
   autoResumeTurns: number;
@@ -31,7 +31,7 @@ export interface LoopControllerState {
   lastRun: LastRunSummary | null;
 }
 
-export interface LoopControllerOptions {
+export interface ResearchProtocolOptions {
   maxAutoResumeTurns: number;
   maxActivationTurns: number;
   benchmarkGuardrail: string;
@@ -55,7 +55,7 @@ export interface PromptSnapshot {
   checksPath: string;
 }
 
-export function createLoopControllerState(): LoopControllerState {
+export function createResearchPhaseState(): ResearchPhaseState {
   return {
     mode: false,
     phase: "inactive",
@@ -68,11 +68,11 @@ export function createLoopControllerState(): LoopControllerState {
   };
 }
 
-export function resetLoopForAgentStart(state: LoopControllerState): void {
+export function resetResearchPhaseForAgentStart(state: ResearchPhaseState): void {
   state.runsSinceAgentStart = 0;
 }
 
-export function enterLoopingFromPersistedLog(state: LoopControllerState): void {
+export function enterResearchLoopingFromPersistedLog(state: ResearchPhaseState): void {
   state.mode = true;
   state.phase = "looping";
   state.activationPrompt = null;
@@ -80,16 +80,16 @@ export function enterLoopingFromPersistedLog(state: LoopControllerState): void {
   state.lastRun = null;
 }
 
-export function detectPhaseFromFiles(snapshot: Pick<ActivationSnapshot, "hasRules" | "hasConfig" | "hasBenchmarkScript">): LoopPhase {
+export function detectPhaseFromFiles(snapshot: Pick<ActivationSnapshot, "hasRules" | "hasConfig" | "hasBenchmarkScript">): ResearchPhase {
   if (snapshot.hasConfig) return "looping";
   if (snapshot.hasRules && snapshot.hasBenchmarkScript) return "needs_init";
   return "inactive";
 }
 
-export function activateLoop(
-  state: LoopControllerState,
+export function activateResearch(
+  state: ResearchPhaseState,
   snapshot: ActivationSnapshot,
-  options: LoopControllerOptions,
+  options: ResearchProtocolOptions,
 ): string {
   state.mode = true;
   state.phase = activationPhase(snapshot);
@@ -101,12 +101,12 @@ export function activateLoop(
   return activationMessage(snapshot, options);
 }
 
-function activationPhase(snapshot: ActivationSnapshot): LoopPhase {
+function activationPhase(snapshot: ActivationSnapshot): ResearchPhase {
   if (!snapshot.hasConfig) return snapshot.hasRules && snapshot.hasBenchmarkScript ? "needs_init" : "activating";
   return "looping";
 }
 
-function activationMessage(snapshot: ActivationSnapshot, options: LoopControllerOptions): string {
+function activationMessage(snapshot: ActivationSnapshot, options: ResearchProtocolOptions): string {
   if (!snapshot.hasConfig) {
     const setupStep = snapshot.hasRules && snapshot.hasBenchmarkScript
       ? "Read goal.md, then call init_goal using its research objective and first experiment metric."
@@ -143,7 +143,7 @@ function activationMessage(snapshot: ActivationSnapshot, options: LoopController
   ].join("\n");
 }
 
-export function deactivateLoop(state: LoopControllerState): void {
+export function deactivateResearch(state: ResearchPhaseState): void {
   state.mode = false;
   state.phase = "inactive";
   state.activationPrompt = null;
@@ -154,11 +154,11 @@ export function deactivateLoop(state: LoopControllerState): void {
   state.lastRun = null;
 }
 
-export function clearLoop(state: LoopControllerState): void {
-  deactivateLoop(state);
+export function clearResearchPhase(state: ResearchPhaseState): void {
+  deactivateResearch(state);
 }
 
-export function onInitExperiment(state: LoopControllerState): void {
+export function onResearchInitialized(state: ResearchPhaseState): void {
   state.mode = true;
   state.phase = "needs_baseline";
   state.activationPrompt = null;
@@ -166,24 +166,24 @@ export function onInitExperiment(state: LoopControllerState): void {
   state.lastRun = null;
 }
 
-export function onRunExperimentFinished(state: LoopControllerState, lastRun: LastRunSummary): void {
+export function onResearchRunFinished(state: ResearchPhaseState, lastRun: LastRunSummary): void {
   state.mode = true;
   state.phase = "awaiting_log";
   state.lastRun = lastRun;
 }
 
-export function onLogExperiment(state: LoopControllerState, limitReached: boolean): void {
+export function onResearchRunLogged(state: ResearchPhaseState, limitReached: boolean): void {
   state.runsSinceAgentStart++;
   state.lastRun = null;
   state.phase = limitReached ? "limit_reached" : "looping";
   if (limitReached) state.mode = false;
 }
 
-export function shouldBlockRunExperiment(state: LoopControllerState): boolean {
+export function shouldBlockResearchRun(state: ResearchPhaseState): boolean {
   return state.phase === "awaiting_log" && state.lastRun !== null;
 }
 
-export function awaitingLogBlockMessage(state: LoopControllerState): string {
+export function researchAwaitingLogBlockMessage(state: ResearchPhaseState): string {
   return [
     "❌ Previous run_goal has not been logged.",
     "Call log_goal first before starting another run_goal.",
@@ -212,30 +212,30 @@ function suggestedLogLine(lastRun: LastRunSummary | null): string {
   return `Suggested next action: log_goal({ status: \"${status}\", metric: ${metric}, metrics: {${metrics}}, asi: { \"hypothesis\": \"...\" } })`;
 }
 
-export function hasPendingResume(state: LoopControllerState): boolean {
+export function hasPendingResearchPhaseResume(state: ResearchPhaseState): boolean {
   return state.pendingResumeMessage !== null;
 }
 
-export function pausePendingResume(_state: LoopControllerState): void {
+export function pausePendingResearchPhaseResume(_state: ResearchPhaseState): void {
   // Timer ownership stays in the extension adapter. This function documents the seam.
 }
 
-export function cancelPendingResume(state: LoopControllerState): void {
+export function cancelPendingResearchPhaseResume(state: ResearchPhaseState): void {
   state.pendingResumeMessage = null;
 }
 
-export function markAutoResumeSent(state: LoopControllerState): void {
+export function markResearchAutoResumeSent(state: ResearchPhaseState): void {
   state.autoResumeTurns++;
   if (state.phase === "activating" || state.phase === "needs_init" || state.phase === "needs_baseline") {
     state.activationTurns++;
   }
 }
 
-export function hasReachedAutoResumeLimit(state: LoopControllerState, options: LoopControllerOptions): boolean {
+export function hasReachedResearchAutoResumeLimit(state: ResearchPhaseState, options: ResearchProtocolOptions): boolean {
   return state.autoResumeTurns >= options.maxAutoResumeTurns;
 }
 
-export function shouldAutoResumeAfterTurn(state: LoopControllerState, options: LoopControllerOptions): boolean {
+export function shouldResearchAutoResumeAfterTurn(state: ResearchPhaseState, options: ResearchProtocolOptions): boolean {
   if (!state.mode) return false;
   if (state.phase === "awaiting_log") return true;
   if (state.phase === "activating" || state.phase === "needs_init" || state.phase === "needs_baseline") {
@@ -247,11 +247,11 @@ export function shouldAutoResumeAfterTurn(state: LoopControllerState, options: L
   return false;
 }
 
-export function shouldAutoResumeAfterCompact(state: LoopControllerState): boolean {
+export function shouldResearchAutoResumeAfterCompact(state: ResearchPhaseState): boolean {
   return state.mode;
 }
 
-export function composeResumeMessage(state: LoopControllerState, options: LoopControllerOptions): string {
+export function composeResearchPhaseResumeMessage(state: ResearchPhaseState, options: ResearchProtocolOptions): string {
   if (state.phase === "activating") {
     return [
       "RESEARCH_ACTIVATION_REQUIRED",
@@ -298,7 +298,7 @@ export function composeResumeMessage(state: LoopControllerState, options: LoopCo
   ].join("\n");
 }
 
-export function composeCompactionResumeMessage(options: LoopControllerOptions): string {
+export function composeResearchPhaseCompactionResumeMessage(options: ResearchProtocolOptions): string {
   return [
     "RESEARCH_NEXT_RUN_REQUIRED",
     "Run the next measured run now.",
@@ -308,7 +308,7 @@ export function composeCompactionResumeMessage(options: LoopControllerOptions): 
   ].join("\n");
 }
 
-export function systemPromptFor(state: LoopControllerState, snapshot: PromptSnapshot, options: LoopControllerOptions): string {
+export function researchPhaseSystemPromptFor(state: ResearchPhaseState, snapshot: PromptSnapshot, options: ResearchProtocolOptions): string {
   if (!state.mode && !(snapshot.hasRules && snapshot.hasBenchmarkScript && !snapshot.hasConfig)) return "";
 
   const phase = state.mode ? state.phase : "needs_init";

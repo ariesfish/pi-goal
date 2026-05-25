@@ -1,9 +1,10 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { matchesKey, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 
-import { formatElapsed } from "./experiment-runner.ts";
-import { clamp, getTuiSize, renderDashboardLines, truncateDisplayText } from "./dashboard-renderer.ts";
-import type { SessionRuntime } from "./runtime.ts";
+import { formatElapsed } from "../execution/experiment-runner.ts";
+import { renderDashboardLines } from "./dashboard-renderer.ts";
+import { clamp, getTuiSize, truncateDisplayText } from "./tui-layout.ts";
+import type { SessionRuntime } from "../support/runtime.ts";
 
 export interface DashboardOverlayController {
   open(ctx: ExtensionContext, runtime: SessionRuntime): Promise<void>;

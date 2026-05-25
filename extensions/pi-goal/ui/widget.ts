@@ -1,20 +1,16 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { visibleWidth, truncateToWidth } from "@mariozechner/pi-tui";
 
+import { renderDashboardLines } from "./dashboard-renderer.ts";
 import {
   appendRightAlignedAdaptiveHint,
   getTuiSize,
   joinPartsToWidth,
-  renderDashboardLines,
   truncateDisplayText,
-} from "./dashboard-renderer.ts";
-import { formatMetricValue } from "./format.ts";
-import type { SessionRuntime } from "./runtime.ts";
-import {
-  currentRuns,
-  findBaselineSecondary,
-  isBetter,
-} from "./research-state.ts";
+} from "./tui-layout.ts";
+import { formatMetricValue } from "./metric-format.ts";
+import type { SessionRuntime } from "../support/runtime.ts";
+import { buildResearchSummaryFromState, isBetterMetric } from "../domain/research-summary.ts";
 
 export interface WidgetController {
   update(ctx: ExtensionContext, runtime: SessionRuntime): void;
@@ -96,33 +92,14 @@ export function createWidgetController(options: {
       ctx.ui.setWidget("goal", (tui, theme) => ({
         render(width: number): string[] {
           const safeWidth = Math.max(1, width || getTuiSize(tui).width);
-          const cur = currentRuns(state.results, state.currentExperimentIndex);
-          const kept = cur.filter((r) => r.status === "keep").length;
-          const crashed = cur.filter((r) => r.status === "crash").length;
-          const checksFailed = cur.filter((r) => r.status === "checks_failed").length;
-          const baseline = state.bestMetric;
-          const baselineSec = findBaselineSecondary(
-            state.results,
-            state.currentExperimentIndex,
-            state.secondaryMetrics
-          );
-
-          let bestPrimary: number | null = null;
-          let bestSec: Record<string, number> = {};
-          let bestRunNum = 0;
-          for (let i = state.results.length - 1; i >= 0; i--) {
-            const r = state.results[i];
-            if (r.experimentIndex !== state.currentExperimentIndex) continue;
-            if (r.status === "keep" && r.metric > 0) {
-              if (bestPrimary === null || isBetter(r.metric, bestPrimary, state.bestDirection)) {
-                bestPrimary = r.metric;
-                bestSec = r.metrics ?? {};
-                bestRunNum = i + 1;
-              }
-            }
-          }
-
-          const displayVal = bestPrimary ?? baseline;
+          const summary = buildResearchSummaryFromState(state);
+          const counts = summary.currentExperiment.statusCounts;
+          const kept = counts.keep;
+          const crashed = counts.crash;
+          const checksFailed = counts.checks_failed;
+          const baseline = summary.currentExperiment.baseline;
+          const best = summary.currentExperiment.best;
+          const displayVal = best?.metric ?? baseline?.metric ?? null;
           const essential = [
             theme.fg("accent", "🎯"),
             theme.fg("muted", ` ${state.results.length} runs`),
@@ -132,17 +109,17 @@ export function createWidgetController(options: {
               "warning",
               theme.bold(`★ ${state.metricName}: ${formatMetricValue(displayVal, state.metricUnit)}`)
             ),
-            bestRunNum > 0 ? theme.fg("dim", ` #${bestRunNum}`) : "",
+            best ? theme.fg("dim", ` #${best.runNumber}`) : "",
           ];
 
           const optional: string[] = [];
           if (crashed > 0) optional.push(theme.fg("error", ` ${crashed}💥`));
           if (checksFailed > 0) optional.push(theme.fg("error", ` ${checksFailed}⚠`));
 
-          if (baseline !== null && bestPrimary !== null && baseline !== 0 && bestPrimary !== baseline) {
-            const pct = ((bestPrimary - baseline) / baseline) * 100;
+          if (best?.deltaPercent !== null && best?.deltaPercent !== undefined && baseline) {
+            const pct = best.deltaPercent;
             const sign = pct > 0 ? "+" : "";
-            const deltaColor = isBetter(bestPrimary, baseline, state.bestDirection)
+            const deltaColor = isBetterMetric(best.metric, baseline.metric, state.bestDirection)
               ? "success"
               : "error";
             optional.push(theme.fg(deltaColor, ` (${sign}${pct.toFixed(1)}%)`));
@@ -157,8 +134,8 @@ export function createWidgetController(options: {
 
           if (state.secondaryMetrics.length > 0) {
             for (const sm of state.secondaryMetrics) {
-              const val = bestSec[sm.name];
-              const bv = baselineSec[sm.name];
+              const val = best?.metrics[sm.name];
+              const bv = summary.currentExperiment.baselineSecondary[sm.name];
               if (val === undefined) continue;
               let secText = `${sm.name}: ${formatMetricValue(val, sm.unit)}`;
               if (bv !== undefined && bv !== 0 && val !== bv) {

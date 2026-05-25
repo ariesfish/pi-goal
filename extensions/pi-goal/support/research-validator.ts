@@ -1,14 +1,7 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { isGoalShCommand, parseMetricLines } from "./experiment-runner.ts";
-import { hasResearchConfigHeader, reconstructResearchStateFromJournal } from "./research-journal.ts";
-import {
-  researchChecksPath,
-  researchJournalPath,
-  researchRulesPath,
-  researchScriptPath,
-} from "./paths.ts";
+import { isGoalShCommand, parseMetricLines } from "../execution/experiment-runner.ts";
+import { readResearchFileContract, shouldUseScriptCommandOnly } from "../persistence/research-files.ts";
 
 export interface ValidatorExecAdapter {
   exec(
@@ -40,53 +33,46 @@ export async function validateResearch(options: {
 }): Promise<ResearchValidationResult> {
   const { workDir, pi, dryRun = true, timeoutMs = 60_000 } = options;
   const issues: ResearchValidationIssue[] = [];
-  const mdPath = researchRulesPath(workDir);
-  const scriptPath = researchScriptPath(workDir);
-  const jsonlPath = researchJournalPath(workDir);
-  const checksPath = researchChecksPath(workDir);
+  const contract = readResearchFileContract(workDir);
 
-  if (!fs.existsSync(mdPath)) {
-    issues.push(error("missing_rules", `${mdPath} does not exist.`));
+  if (!contract.hasRules) {
+    issues.push(error("missing_rules", `${contract.rulesPath} does not exist.`));
+  } else if (contract.invalidRules) {
+    issues.push(error("invalid_rules", contract.invalidRules));
   }
 
-  if (!fs.existsSync(scriptPath)) {
-    issues.push(error("missing_script", `${scriptPath} does not exist.`));
-  } else if (!fs.statSync(scriptPath).isFile()) {
-    issues.push(error("invalid_script", `${scriptPath} is not a file.`));
+  if (!contract.hasBenchmarkScript) {
+    issues.push(error("missing_script", `${contract.scriptPath} does not exist.`));
+  } else if (contract.invalidBenchmarkScript) {
+    issues.push(error("invalid_script", contract.invalidBenchmarkScript));
   }
 
-  let metricName: string | null = null;
-  if (!fs.existsSync(jsonlPath)) {
-    issues.push(error("missing_jsonl", `${jsonlPath} does not exist. Call init_goal.`));
-  } else {
-    const content = readFile(jsonlPath, issues);
-    if (content !== null) {
-      if (!hasResearchConfigHeader(content)) {
-        issues.push(error("missing_config_header", `${jsonlPath} has no config header. Call init_goal.`));
-      } else {
-        const state = reconstructResearchStateFromJournal(content);
-        metricName = state.metricName;
-      }
-    }
+  if (!contract.hasJournal) {
+    issues.push(error("missing_jsonl", `${contract.journalPath} does not exist. Call init_goal.`));
+  } else if (contract.journalReadError) {
+    issues.push(error("read_failed", `Could not read ${contract.journalPath}: ${contract.journalReadError}`));
+  } else if (!contract.hasConfigHeader) {
+    issues.push(error("missing_config_header", `${contract.journalPath} has no config header. Call init_goal.`));
   }
 
-  if (fs.existsSync(checksPath) && !fs.statSync(checksPath).isFile()) {
-    issues.push(error("invalid_checks", `${checksPath} exists but is not a file.`));
+  if (contract.invalidChecks) {
+    issues.push(error("invalid_checks", contract.invalidChecks));
   }
 
+  const metricName = contract.metricName;
   let parsedMetrics: Record<string, number> | null = null;
-  if (dryRun && fs.existsSync(scriptPath) && metricName) {
+  if (dryRun && shouldUseScriptCommandOnly(contract) && metricName) {
     if (!isGoalShCommand("bash goal.sh")) {
       issues.push(error("invalid_script_command", "Internal validator command was rejected by goal.sh guard."));
     } else {
       try {
-        const result = await pi.exec("bash", [scriptPath], { cwd: workDir, timeout: timeoutMs });
+        const result = await pi.exec("bash", [contract.scriptPath], { cwd: workDir, timeout: timeoutMs });
         const output = `${result.stdout}\n${result.stderr}`;
         parsedMetrics = Object.fromEntries(parseMetricLines(output));
         if (result.killed) {
-          issues.push(error("script_timeout", `${path.basename(scriptPath)} timed out during validation.`));
+          issues.push(error("script_timeout", `${path.basename(contract.scriptPath)} timed out during validation.`));
         } else if (result.code !== 0) {
-          issues.push(error("script_failed", `${path.basename(scriptPath)} exited ${result.code} during validation.`));
+          issues.push(error("script_failed", `${path.basename(contract.scriptPath)} exited ${result.code} during validation.`));
         } else if (!(metricName in parsedMetrics)) {
           issues.push(error(
             "missing_primary_metric",
@@ -96,7 +82,7 @@ export async function validateResearch(options: {
       } catch (validationError) {
         issues.push(error(
           "script_exec_failed",
-          `Could not run ${path.basename(scriptPath)} during validation: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
+          `Could not run ${path.basename(contract.scriptPath)} during validation: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
         ));
       }
     }
@@ -125,15 +111,6 @@ export function formatResearchValidationResult(result: ResearchValidationResult)
     }
   }
   return lines.join("\n");
-}
-
-function readFile(filePath: string, issues: ResearchValidationIssue[]): string | null {
-  try {
-    return fs.readFileSync(filePath, "utf-8");
-  } catch (readError) {
-    issues.push(error("read_failed", `Could not read ${filePath}: ${readError instanceof Error ? readError.message : String(readError)}`));
-    return null;
-  }
 }
 
 function error(code: string, message: string): ResearchValidationIssue {

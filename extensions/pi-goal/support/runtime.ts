@@ -1,5 +1,5 @@
-import { createResearchState, type RunResult, type ResearchState } from "./research-state.ts";
-import { createLoopControllerState, type LoopControllerState } from "./loop-controller.ts";
+import { createResearchState, type RunResult, type ResearchState } from "../domain/research-state.ts";
+import { createResearchPhaseState, type ResearchPhaseState } from "../protocol/research-phase.ts";
 
 export interface LogDetails {
   runResult: RunResult;
@@ -8,7 +8,7 @@ export interface LogDetails {
 }
 
 export interface SessionRuntime {
-  loop: LoopControllerState;
+  loop: ResearchPhaseState;
   dashboardExpanded: boolean;
   lastRunChecks: { pass: boolean; output: string; duration: number } | null;
   lastRunDuration: number | null;
@@ -20,7 +20,7 @@ export interface SessionRuntime {
 
 export function createSessionRuntime(): SessionRuntime {
   return {
-    loop: createLoopControllerState(),
+    loop: createResearchPhaseState(),
     dashboardExpanded: false,
     lastRunChecks: null,
     lastRunDuration: null,

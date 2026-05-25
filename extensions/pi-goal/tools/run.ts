@@ -1,26 +1,24 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { formatSize } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
-import * as fs from "node:fs";
-
-import { resolveWorkDir, validateWorkDir } from "../config.ts";
-import { formatMetricValue } from "../format.ts";
+import { resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
+import { formatMetricValue } from "../ui/metric-format.ts";
 import {
   EXPERIMENT_MAX_BYTES,
   EXPERIMENT_MAX_LINES,
   isGoalShCommand,
   runExperiment,
   type RunDetails,
-} from "../experiment-runner.ts";
+} from "../execution/experiment-runner.ts";
 import {
-  awaitingLogBlockMessage,
-  onRunExperimentFinished as controllerOnRunExperimentFinished,
-  shouldBlockRunExperiment,
-} from "../loop-controller.ts";
-import { researchScriptPath } from "../paths.ts";
-import type { SessionRuntime } from "../runtime.ts";
-import { RunParams } from "../schema.ts";
-import { currentRuns, type ResearchState } from "../research-state.ts";
+  researchAwaitingLogBlockMessage,
+  onResearchRunFinished as controllerOnRunExperimentFinished,
+  shouldBlockResearchRun,
+} from "../protocol/research-phase.ts";
+import { readResearchFileContract, shouldUseScriptCommandOnly } from "../persistence/research-files.ts";
+import type { SessionRuntime } from "../support/runtime.ts";
+import { RunParams } from "../support/schema.ts";
+import { currentRuns, type ResearchState } from "../domain/research-state.ts";
 
 export interface RunExperimentToolDeps {
   getRuntime(ctx: ExtensionContext): SessionRuntime;
@@ -62,9 +60,9 @@ export function registerRunExperimentTool(pi: ExtensionAPI, deps: RunExperimentT
     }
     const workDir = resolveWorkDir(ctx.cwd);
 
-    if (shouldBlockRunExperiment(runtime.loop)) {
+    if (shouldBlockResearchRun(runtime.loop)) {
       return {
-        content: [{ type: "text", text: awaitingLogBlockMessage(runtime.loop) }],
+        content: [{ type: "text", text: researchAwaitingLogBlockMessage(runtime.loop) }],
         details: {},
       };
     }
@@ -81,12 +79,12 @@ export function registerRunExperimentTool(pi: ExtensionAPI, deps: RunExperimentT
     }
 
     // Guard: if goal.sh exists, only allow running it
-    const goalShPath = researchScriptPath(workDir);
-    if (fs.existsSync(goalShPath) && !isGoalShCommand(params.command)) {
+    const fileContract = readResearchFileContract(workDir);
+    if (shouldUseScriptCommandOnly(fileContract) && !isGoalShCommand(params.command)) {
       return {
         content: [{
           type: "text",
-          text: `❌ goal.sh exists — you must run it instead of a custom command.\n\nFound: ${goalShPath}\nYour command: ${params.command}\n\nUse: run_goal({ command: "bash goal.sh" }) or run_goal({ command: "./goal.sh" })`,
+          text: `❌ goal.sh exists — you must run it instead of a custom command.\n\nFound: ${fileContract.scriptPath}\nYour command: ${params.command}\n\nUse: run_goal({ command: "bash goal.sh" }) or run_goal({ command: "./goal.sh" })`,
         }],
         details: {
           command: params.command,
@@ -153,7 +151,7 @@ export function registerRunExperimentTool(pi: ExtensionAPI, deps: RunExperimentT
     const parsedMetrics = details.parsedMetrics;
     const parsedPrimary = details.parsedPrimary;
 
-    const missingPrimaryMetric = benchmarkPassed && fs.existsSync(goalShPath) && details.parsedPrimary === null;
+    const missingPrimaryMetric = benchmarkPassed && shouldUseScriptCommandOnly(fileContract) && details.parsedPrimary === null;
 
     // Build LLM response
     let text = "";

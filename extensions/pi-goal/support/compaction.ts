@@ -10,19 +10,19 @@
 import * as fs from "node:fs";
 import {
   reconstructResearchStateFromJournal,
-  type ReconstructedResearchState,
-  type ReconstructedRun,
-} from "./research-journal.ts";
+} from "../persistence/research-journal.ts";
 import {
   researchIdeasPath,
   researchJournalPath,
   researchRulesPath,
-} from "./paths.ts";
+} from "../persistence/research-paths.ts";
+import {
+  buildResearchSummary,
+  type ResearchSummary,
+  type ResearchRunSummary,
+} from "../domain/research-summary.ts";
 
 const RECENT_RUN_LIMIT = 50;
-
-type RunStatus = ReconstructedRun["status"];
-type StatusCounts = Record<RunStatus, number>;
 
 export interface ResearchSummaryPaths {
   workDir: string;
@@ -45,20 +45,23 @@ export function researchSummaryPathsFor(workDir: string): ResearchSummaryPaths {
  * Returns a markdown string that is itself the entire compaction summary.
  */
 export function buildResearchCompactionSummary(paths: ResearchSummaryPaths): string {
-  const state = loadState(paths.jsonlPath);
+  const model = loadSummary(paths.jsonlPath);
   const sections = [
     headerSection(),
-    researchSection(state),
+    researchSection(model),
     rulesSection(paths.mdPath),
     ideasSection(paths.ideasPath),
-    recentRunsSection(state),
+    recentRunsSection(model),
     nextStepSection(),
   ];
   return sections.filter(Boolean).join("\n\n");
 }
 
-function loadState(jsonlPath: string): ReconstructedResearchState {
-  return reconstructResearchStateFromJournal(readFileOrEmpty(jsonlPath));
+function loadSummary(jsonlPath: string): ResearchSummary {
+  return buildResearchSummary(
+    reconstructResearchStateFromJournal(readFileOrEmpty(jsonlPath)),
+    { recentRunLimit: RECENT_RUN_LIMIT },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -74,53 +77,38 @@ function headerSection(): string {
   ].join("\n");
 }
 
-function researchSection(state: ReconstructedResearchState): string {
-  const runs = currentExperimentIndexRuns(state);
+function researchSection(model: ResearchSummary): string {
   const lines = [
     "## Research",
     "",
-    `Goal: ${state.name ?? "—"}`,
-    `Metric: ${state.metricName} — ${state.bestDirection} is better`,
-    runCountLine(runs),
-    ...baselineAndBestLines(runs, state.bestDirection, state.metricUnit),
+    `Goal: ${model.name ?? "—"}`,
+    `Metric: ${model.metricName} — ${model.direction} is better`,
+    runCountLine(model),
+    ...baselineAndBestLines(model),
   ];
   return lines.join("\n");
 }
 
-function currentExperimentIndexRuns(state: ReconstructedResearchState): ReconstructedRun[] {
-  return state.results.filter((run) => run.experimentIndex === state.currentExperimentIndex);
-}
-
-function runCountLine(runs: ReconstructedRun[]): string {
-  if (runs.length === 0) return "Runs so far: 0";
-  const counts = countByStatus(runs);
+function runCountLine(model: ResearchSummary): string {
+  const { runCount, statusCounts: counts } = model.currentExperiment;
+  if (runCount === 0) return "Runs so far: 0";
   const parts = [
     `${counts.keep} keep`,
     counts.discard ? `${counts.discard} discard` : "",
     counts.crash ? `${counts.crash} crash` : "",
     counts.checks_failed ? `${counts.checks_failed} checks_failed` : "",
   ].filter(Boolean);
-  return `Runs so far: ${runs.length} (${parts.join(" · ")})`;
+  return `Runs so far: ${runCount} (${parts.join(" · ")})`;
 }
 
-function countByStatus(runs: ReconstructedRun[]): StatusCounts {
-  const counts: StatusCounts = { keep: 0, discard: 0, crash: 0, checks_failed: 0 };
-  for (const run of runs) counts[run.status]++;
-  return counts;
-}
-
-function baselineAndBestLines(
-  runs: ReconstructedRun[],
-  direction: "lower" | "higher",
-  unit: string,
-): string[] {
-  const baseline = runs[0];
+function baselineAndBestLines(model: ResearchSummary): string[] {
+  const baseline = model.currentExperiment.baseline;
   if (!baseline) return [];
-  const lines = [`Baseline (#${baseline.run}): ${formatMetricWithUnit(baseline.metric, unit)}`];
-  const best = bestRun(runs, direction);
-  if (best && best.run !== baseline.run) {
+  const lines = [`Baseline (#${baseline.runNumber}): ${formatMetricWithUnit(baseline.metric, model.metricUnit)}`];
+  const best = model.currentExperiment.best;
+  if (best && best.runNumber !== baseline.runNumber) {
     lines.push(
-      `Best     (#${best.run}): ${formatMetricWithUnit(best.metric, unit)}${formatDelta(best.metric, baseline.metric)}`,
+      `Best     (#${best.runNumber}): ${formatMetricWithUnit(best.metric, model.metricUnit)}${formatDeltaPercent(best.deltaPercent)}`,
     );
   }
   return lines;
@@ -128,16 +116,6 @@ function baselineAndBestLines(
 
 function formatMetricWithUnit(value: number, unit: string): string {
   return `${formatMetric(value)}${unit}`;
-}
-
-function bestRun(runs: ReconstructedRun[], direction: "lower" | "higher"): ReconstructedRun | null {
-  const kept = runs.filter((run) => run.status === "keep" && Number.isFinite(run.metric));
-  if (kept.length === 0) return null;
-  return kept.reduce((best, run) => (isBetter(run.metric, best.metric, direction) ? run : best));
-}
-
-function isBetter(value: number, current: number, direction: "lower" | "higher"): boolean {
-  return direction === "lower" ? value < current : value > current;
 }
 
 function rulesSection(mdPath: string): string {
@@ -152,12 +130,12 @@ function ideasSection(ideasPath: string): string {
   return `## Ideas Backlog (goal.ideas.md)\n\n${content}`;
 }
 
-function recentRunsSection(state: ReconstructedResearchState): string {
-  const runs = state.results.slice(-RECENT_RUN_LIMIT);
+function recentRunsSection(model: ResearchSummary): string {
+  const runs = model.recentRuns;
   if (runs.length === 0) {
     return "## Recent Runs\n\nNo runs yet — start with the first hypothesis.";
   }
-  const lines = runs.map((run) => formatRunLine(run, baselineFor(run, state.results)));
+  const lines = runs.map(formatRunLine);
   return [
     `## Recent Runs (last ${runs.length})`,
     "",
@@ -182,19 +160,13 @@ function nextStepSection(): string {
 // Recent runs
 // ---------------------------------------------------------------------------
 
-/** Baseline metric for a run = first run in the same experimentIndex across full reconstructed state. */
-function baselineFor(run: ReconstructedRun, all: ReconstructedRun[]): number | null {
-  const sameExperiment = all.find((other) => other.experimentIndex === run.experimentIndex);
-  return sameExperiment?.metric ?? null;
-}
-
-function formatRunLine(run: ReconstructedRun, baseline: number | null): string {
-  const head = `#${run.run} ${padStatus(run.status)} ${formatMetric(run.metric)}${formatDelta(run.metric, baseline)}`;
+function formatRunLine(run: ResearchRunSummary): string {
+  const head = `#${run.runNumber} ${padStatus(run.status)} ${formatMetric(run.metric)}${formatDeltaPercent(run.deltaPercent)}`;
   const parts = [head, formatDescription(run), ...formatAsiFields(run.asi)];
   return parts.filter(Boolean).join(" | ");
 }
 
-function padStatus(status: ReconstructedRun["status"]): string {
+function padStatus(status: ResearchRunSummary["status"]): string {
   return status.padEnd(STATUS_WIDTH);
 }
 
@@ -206,18 +178,17 @@ function formatMetric(value: number): string {
   return value.toFixed(2);
 }
 
-function formatDelta(value: number, baseline: number | null): string {
-  if (baseline === null || baseline === 0 || value === baseline) return "";
-  const pct = ((value - baseline) / baseline) * 100;
+function formatDeltaPercent(pct: number | null): string {
+  if (pct === null) return "";
   const sign = pct > 0 ? "+" : "";
   return ` (${sign}${pct.toFixed(1)}%)`;
 }
 
-function formatDescription(run: ReconstructedRun): string {
+function formatDescription(run: ResearchRunSummary): string {
   return run.description ? `desc: ${run.description}` : "";
 }
 
-function formatAsiFields(asi: ReconstructedRun["asi"]): string[] {
+function formatAsiFields(asi: ResearchRunSummary["asi"]): string[] {
   if (!asi) return [];
   return [
     formatAsiField(asi, "hypothesis", "hyp"),

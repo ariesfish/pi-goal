@@ -1,13 +1,14 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 
+import type { ResearchProtocolOptions } from "./research-phase.ts";
 import {
-  cancelPendingResume as cancelControllerPendingResume,
-  hasPendingResume as controllerHasPendingResume,
-  hasReachedAutoResumeLimit as controllerHasReachedAutoResumeLimit,
-  markAutoResumeSent as markControllerAutoResumeSent,
-  type LoopControllerOptions,
-} from "./loop-controller.ts";
-import type { SessionRuntime } from "./runtime.ts";
+  cancelResearchResume,
+  decidePendingResearchResume,
+  hasPendingResearchResume,
+  onResearchResumeDelivered,
+  shouldNotifyResearchResumeLimit,
+} from "./research-protocol.ts";
+import type { SessionRuntime } from "../support/runtime.ts";
 
 export interface ResumeAdapter {
   pause(runtime: SessionRuntime): void;
@@ -23,10 +24,10 @@ export interface ResumeAdapter {
 
 export function createResumeAdapter(options: {
   pi: ExtensionAPI;
-  loopOptions: LoopControllerOptions;
+  loopOptions: ResearchProtocolOptions;
   settledWindowMs: number;
   notifyAutoResumeLimitReached(ctx: ExtensionContext): void;
-  composeResumeMessage(ctx: ExtensionContext): string;
+  composeResearchPhaseResumeMessage(ctx: ExtensionContext): string;
 }): ResumeAdapter {
   const isAgentSettled = (ctx: ExtensionContext): boolean =>
     ctx.isIdle() && !ctx.hasPendingMessages();
@@ -39,27 +40,25 @@ export function createResumeAdapter(options: {
 
   const cancel = (runtime: SessionRuntime): void => {
     pause(runtime);
-    cancelControllerPendingResume(runtime.loop);
+    cancelResearchResume(runtime);
   };
 
   const sendPendingResumeIfReady = (ctx: ExtensionContext, runtime: SessionRuntime): void => {
-    const message = runtime.loop.pendingResumeMessage;
-
-    if (!message) return;
-    if (!runtime.loop.mode) {
+    const decision = decidePendingResearchResume(runtime, options.loopOptions, isAgentSettled(ctx));
+    if (decision.action === "wait") return;
+    if (decision.action === "cancel") {
       cancel(runtime);
       return;
     }
-    if (!isAgentSettled(ctx)) return;
-    if (controllerHasReachedAutoResumeLimit(runtime.loop, options.loopOptions)) {
+    if (decision.action === "limit_reached") {
       cancel(runtime);
       options.notifyAutoResumeLimitReached(ctx);
       return;
     }
 
-    cancel(runtime);
-    markControllerAutoResumeSent(runtime.loop);
-    options.pi.sendUserMessage(message);
+    onResearchResumeDelivered(runtime);
+    pause(runtime);
+    options.pi.sendUserMessage(decision.message);
   };
 
   const schedule = (ctx: ExtensionContext, runtime: SessionRuntime, message: string): void => {
@@ -72,7 +71,7 @@ export function createResumeAdapter(options: {
   };
 
   const reschedule = (ctx: ExtensionContext, runtime: SessionRuntime): void => {
-    if (!controllerHasPendingResume(runtime.loop)) return;
+    if (!hasPendingResearchResume(runtime)) return;
     schedule(ctx, runtime, runtime.loop.pendingResumeMessage!);
   };
 
@@ -80,14 +79,14 @@ export function createResumeAdapter(options: {
     ctx: ExtensionContext,
     runtime: SessionRuntime,
     gate: (runtime: SessionRuntime) => boolean,
-    composeMessage: (ctx: ExtensionContext) => string = options.composeResumeMessage,
+    composeMessage: (ctx: ExtensionContext) => string = options.composeResearchPhaseResumeMessage,
   ): void => {
-    if (controllerHasPendingResume(runtime.loop)) {
+    if (hasPendingResearchResume(runtime)) {
       reschedule(ctx, runtime);
       return;
     }
     if (!gate(runtime)) return;
-    if (controllerHasReachedAutoResumeLimit(runtime.loop, options.loopOptions)) {
+    if (shouldNotifyResearchResumeLimit(runtime, options.loopOptions)) {
       options.notifyAutoResumeLimitReached(ctx);
       return;
     }

@@ -6,8 +6,8 @@ import { createServer, type Server, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { extractResearchName } from "./research-journal.ts";
-import { researchJournalPath } from "./paths.ts";
+import { extractResearchName } from "../persistence/research-journal.ts";
+import { researchJournalPath } from "../persistence/research-paths.ts";
 
 const TITLE_PLACEHOLDER = "__GOAL_TITLE__";
 const LOGO_PLACEHOLDER = "__GOAL_LOGO__";
