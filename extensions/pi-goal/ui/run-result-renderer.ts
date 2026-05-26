@@ -1,4 +1,4 @@
-import { formatSize, type Theme } from "@mariozechner/pi-coding-agent";
+import { formatSize, type Theme } from "@earendil-works/pi-coding-agent";
 
 import {
   EXPERIMENT_MAX_BYTES,
