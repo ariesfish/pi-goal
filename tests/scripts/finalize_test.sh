@@ -18,6 +18,11 @@ TESTS_FAILED=0
 pass() { TESTS_PASSED=$((TESTS_PASSED + 1)); echo -e "${GREEN}✓ $1${NC}"; }
 fail_test() { TESTS_FAILED=$((TESTS_FAILED + 1)); echo -e "${RED}✗ $1${NC}"; echo "  $2"; }
 
+configure_test_git_identity() {
+  git config user.name "pi-goal tests"
+  git config user.email "pi-goal-tests@example.invalid"
+}
+
 # Create a fresh test repo with a simulated goal session
 # Returns the repo path
 setup_repo() {
@@ -26,6 +31,7 @@ setup_repo() {
   cd "$REPO"
   git init --quiet
   git checkout -b main
+  configure_test_git_identity
 
   # Initial commit on main
   echo "original" > file_a.txt
@@ -667,6 +673,7 @@ test_nested_session_artifacts() {
   cd "$REPO"
   git init --quiet
   git checkout -b main
+  configure_test_git_identity
 
   mkdir -p libs/polaris
   echo "original" > libs/polaris/component.ts
@@ -916,6 +923,7 @@ test_three_groups() {
   cd "$REPO"
   git init --quiet
   git checkout -b main
+  configure_test_git_identity
 
   echo "original_a" > file_a.txt
   echo "original_b" > file_b.txt
