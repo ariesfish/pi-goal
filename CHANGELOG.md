@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.0] - 2026-05-26
+
+### Changed
+
+- Publish workflow now runs only on `v*.*.*` version tags or manual dispatch.
+- CI now runs on every push and pull request to `main`.
+- Updated GitHub Actions to Node 24-compatible major versions.
+- Removed publish workflow pnpm cache to avoid skipped-install cache path warnings.
+
 ## [0.2.0] - 2026-05-26
 
 ### Changed
