@@ -5,7 +5,7 @@ set -euo pipefail
 # Creates temp git repos, simulates goal sessions, and verifies behavior.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-FINALIZE="$SCRIPT_DIR/../skills/goal-finalize/finalize.sh"
+FINALIZE="$SCRIPT_DIR/../../skills/goal-finalize/finalize.sh"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

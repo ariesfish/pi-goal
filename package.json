@@ -45,7 +45,8 @@
     "package.json"
   ],
   "scripts": {
-    "test": "node --experimental-strip-types --test \"tests/**/*.test.mjs\""
+    "test": "node --experimental-strip-types --test \"tests/**/*.test.mjs\"",
+    "test:finalize": "bash tests/scripts/finalize_test.sh"
   },
   "peerDependencies": {
     "@mariozechner/pi-ai": "*",
