@@ -12,12 +12,12 @@ export interface ResearchRunEntry extends JournalEntry {
   run: number;
 }
 
-export interface ReconstructedMetricDef {
+export interface ResearchJournalMetricDef {
   name: string;
   unit: string;
 }
 
-export interface ReconstructedRun {
+export interface ResearchJournalRun {
   run: number;
   commit: string;
   metric: number;
@@ -30,14 +30,14 @@ export interface ReconstructedRun {
   asi?: Record<string, unknown>;
 }
 
-export interface ReconstructedResearchState {
+export interface ResearchJournalModel {
   name: string | null;
   metricName: string;
   metricUnit: string;
   bestDirection: "lower" | "higher";
   currentExperimentIndex: number;
-  results: ReconstructedRun[];
-  secondaryMetrics: ReconstructedMetricDef[];
+  results: ResearchJournalRun[];
+  secondaryMetrics: ResearchJournalMetricDef[];
 }
 
 const DEFAULT_METRIC_NAME = "metric";
@@ -71,14 +71,14 @@ function metricMapFrom(value: unknown): Record<string, number> {
   return metrics;
 }
 
-function statusFrom(value: unknown): ReconstructedRun["status"] {
+function statusFrom(value: unknown): ResearchJournalRun["status"] {
   if (value === "discard") return "discard";
   if (value === "crash") return "crash";
   if (value === "checks_failed") return "checks_failed";
   return "keep";
 }
 
-function directionFrom(value: unknown): ReconstructedResearchState["bestDirection"] {
+function directionFrom(value: unknown): ResearchJournalModel["bestDirection"] {
   return value === "higher" ? "higher" : DEFAULT_DIRECTION;
 }
 
@@ -86,7 +86,7 @@ function asiFrom(value: unknown): Record<string, unknown> | undefined {
   return isObjectRecord(value) ? value : undefined;
 }
 
-function reconstructedState(): ReconstructedResearchState {
+function reconstructedState(): ResearchJournalModel {
   return {
     name: null,
     metricName: DEFAULT_METRIC_NAME,
@@ -98,20 +98,20 @@ function reconstructedState(): ReconstructedResearchState {
   };
 }
 
-function updateConfig(state: ReconstructedResearchState, entry: ResearchConfigEntry): void {
+function updateConfig(state: ResearchJournalModel, entry: ResearchConfigEntry): void {
   if (typeof entry.name === "string") state.name = entry.name;
   if (typeof entry.metricName === "string") state.metricName = entry.metricName;
   if (typeof entry.metricUnit === "string") state.metricUnit = entry.metricUnit;
   state.bestDirection = directionFrom(entry.bestDirection);
 }
 
-function nextExperimentIndex(state: ReconstructedResearchState, experimentIndex: number): number {
+function nextExperimentIndex(state: ResearchJournalModel, experimentIndex: number): number {
   if (state.results.length === 0) return experimentIndex;
   state.secondaryMetrics = [];
   return experimentIndex + 1;
 }
 
-function runFrom(entry: ResearchRunEntry, experimentIndex: number): ReconstructedRun {
+function runFrom(entry: ResearchRunEntry, experimentIndex: number): ResearchJournalRun {
   const entryExperimentIndex = typeof entry.experimentIndex === "number" ? entry.experimentIndex : experimentIndex;
   return {
     run: typeof entry.run === "number" ? entry.run : 0,
@@ -127,7 +127,7 @@ function runFrom(entry: ResearchRunEntry, experimentIndex: number): Reconstructe
   };
 }
 
-function registerSecondaryMetrics(state: ReconstructedResearchState, metrics: Record<string, number>): void {
+function registerSecondaryMetrics(state: ResearchJournalModel, metrics: Record<string, number>): void {
   for (const name of Object.keys(metrics)) {
     if (state.secondaryMetrics.find((metric) => metric.name === name)) continue;
     state.secondaryMetrics.push({ name, unit: inferMetricUnit(name) });
@@ -167,7 +167,7 @@ export function extractResearchName(jsonlContent: string): string {
   return firstConfigEntry(jsonlContent)?.name || "Research";
 }
 
-export function reconstructResearchStateFromJournal(jsonlContent: string): ReconstructedResearchState {
+export function parseResearchJournalModel(jsonlContent: string): ResearchJournalModel {
   const state = reconstructedState();
   let experimentIndex = 0;
 

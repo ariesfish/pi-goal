@@ -1,13 +1,14 @@
 import * as fs from "node:fs";
 
-import { hasResearchConfigHeader, reconstructResearchStateFromJournal } from "./research-journal.ts";
+import { activeResearch } from "./research-directory.ts";
 import {
-  researchChecksPath,
-  researchIdeasPath,
-  researchJournalPath,
-  researchRulesPath,
-  researchScriptPath,
-} from "./research-paths.ts";
+  hasResearchConfigHeader,
+  parseResearchJournalModel,
+} from "./research-journal-codec.ts";
+import {
+  researchValidationError,
+  type ResearchValidationIssue,
+} from "../domain/research-validation.ts";
 
 export interface ResearchFileContract {
   workDir: string;
@@ -29,12 +30,18 @@ export interface ResearchFileContract {
   journalReadError: string | null;
 }
 
+export interface ResearchFileValidationResult {
+  contract: ResearchFileContract;
+  issues: ResearchValidationIssue[];
+}
+
 export function readResearchFileContract(workDir: string): ResearchFileContract {
-  const rulesPath = researchRulesPath(workDir);
-  const scriptPath = researchScriptPath(workDir);
-  const checksPath = researchChecksPath(workDir);
-  const ideasPath = researchIdeasPath(workDir);
-  const journalPath = researchJournalPath(workDir);
+  const paths = activeResearch(workDir).paths;
+  const rulesPath = paths.rules;
+  const scriptPath = paths.script;
+  const checksPath = paths.checks;
+  const ideasPath = paths.ideas;
+  const journalPath = paths.journal;
 
   const hasRules = fs.existsSync(rulesPath);
   const hasBenchmarkScript = fs.existsSync(scriptPath);
@@ -51,7 +58,7 @@ export function readResearchFileContract(workDir: string): ResearchFileContract 
       const content = fs.readFileSync(journalPath, "utf-8");
       hasConfigHeader = hasResearchConfigHeader(content);
       if (hasConfigHeader) {
-        metricName = reconstructResearchStateFromJournal(content).metricName;
+        metricName = parseResearchJournalModel(content).metricName;
       }
     } catch (error) {
       journalReadError = error instanceof Error ? error.message : String(error);
@@ -77,6 +84,37 @@ export function readResearchFileContract(workDir: string): ResearchFileContract 
     invalidChecks: hasChecks && !isFile(checksPath) ? `${checksPath} exists but is not a file.` : null,
     journalReadError,
   };
+}
+
+export function validateResearchFiles(workDir: string): ResearchFileValidationResult {
+  const contract = readResearchFileContract(workDir);
+  const issues: ResearchValidationIssue[] = [];
+
+  if (!contract.hasRules) {
+    issues.push(researchValidationError("missing_rules", `${contract.rulesPath} does not exist.`));
+  } else if (contract.invalidRules) {
+    issues.push(researchValidationError("invalid_rules", contract.invalidRules));
+  }
+
+  if (!contract.hasBenchmarkScript) {
+    issues.push(researchValidationError("missing_script", `${contract.scriptPath} does not exist.`));
+  } else if (contract.invalidBenchmarkScript) {
+    issues.push(researchValidationError("invalid_script", contract.invalidBenchmarkScript));
+  }
+
+  if (!contract.hasJournal) {
+    issues.push(researchValidationError("missing_jsonl", `${contract.journalPath} does not exist. Call init_goal.`));
+  } else if (contract.journalReadError) {
+    issues.push(researchValidationError("read_failed", `Could not read ${contract.journalPath}: ${contract.journalReadError}`));
+  } else if (!contract.hasConfigHeader) {
+    issues.push(researchValidationError("missing_config_header", `${contract.journalPath} has no config header. Call init_goal.`));
+  }
+
+  if (contract.invalidChecks) {
+    issues.push(researchValidationError("invalid_checks", contract.invalidChecks));
+  }
+
+  return { contract, issues };
 }
 
 function isFile(filePath: string): boolean {

@@ -1,10 +1,11 @@
-import type { HookPayload, ResearchSnapshot } from "./execution/hooks.ts";
+import type { HookPayload } from "./execution/hooks.ts";
+import type { ResearchSnapshot } from "./domain/research-snapshot.ts";
 import {
   applyRunResult,
   validateRunResultInput,
   type LogRunParams,
 } from "./domain/run-result.ts";
-import { runResultJournalEntry, appendRunResultToJournal } from "./persistence/run-result-store.ts";
+import { runResultJournalEntry, appendRunResultToJournal } from "./persistence/run-result-journal-writer.ts";
 import { formatLogSummary } from "./ui/log-result-renderer.ts";
 import { applyKeptRunResultTransaction, restoreRejectedRunResultTransaction } from "./workspace/run-result-transaction.ts";
 import type { WorkspaceExecAdapter } from "./workspace/research-workspace.ts";

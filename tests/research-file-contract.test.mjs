@@ -10,12 +10,12 @@ import {
   promptSnapshotFor,
 } from "../extensions/pi-goal/protocol/research-file-snapshots.ts";
 import { shouldUseScriptCommandOnly } from "../extensions/pi-goal/execution/research-command-policy.ts";
-import { ensureActiveResearchDirectory } from "../extensions/pi-goal/persistence/research-directory.ts";
+import { ensureActiveResearch } from "../extensions/pi-goal/persistence/research-directory.ts";
 
 test("research file contract summarizes active research files and config header", () => {
   const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-contract-"));
   try {
-    const researchDir = ensureActiveResearchDirectory(projectDir);
+    const researchDir = ensureActiveResearch(projectDir).paths.directory;
     fs.writeFileSync(path.join(researchDir, "goal.md"), "# Goal\n");
     fs.writeFileSync(path.join(researchDir, "goal.sh"), "#!/usr/bin/env bash\n");
     fs.writeFileSync(path.join(researchDir, "goal.ideas.md"), "- try x\n");
@@ -47,7 +47,7 @@ test("research file contract summarizes active research files and config header"
 test("research file contract reports invalid benchmark script", () => {
   const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-contract-"));
   try {
-    const researchDir = ensureActiveResearchDirectory(projectDir);
+    const researchDir = ensureActiveResearch(projectDir).paths.directory;
     fs.mkdirSync(path.join(researchDir, "goal.sh"));
 
     const contract = readResearchFileContract(projectDir);

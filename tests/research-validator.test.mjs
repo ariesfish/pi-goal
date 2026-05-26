@@ -5,10 +5,10 @@ import { tmpdir } from "node:os";
 import test from "node:test";
 
 import { validateResearch } from "../extensions/pi-goal/research-validation-workflow.ts";
-import { ensureActiveResearchDirectory } from "../extensions/pi-goal/persistence/research-directory.ts";
+import { ensureActiveResearch } from "../extensions/pi-goal/persistence/research-directory.ts";
 
 function writeResearchFiles(projectDir, metricName = "total_ms") {
-  const researchDir = ensureActiveResearchDirectory(projectDir);
+  const researchDir = ensureActiveResearch(projectDir).paths.directory;
   fs.writeFileSync(path.join(researchDir, "goal.md"), "# Goal");
   fs.writeFileSync(path.join(researchDir, "goal.sh"), "#!/usr/bin/env bash\n");
   fs.writeFileSync(path.join(researchDir, "goal.jsonl"), JSON.stringify({
@@ -69,7 +69,7 @@ test("validator reports missing Research Journal without running goal.sh", async
   const dir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-validator-"));
   let execCount = 0;
   try {
-    const researchDir = ensureActiveResearchDirectory(dir);
+    const researchDir = ensureActiveResearch(dir).paths.directory;
     fs.writeFileSync(path.join(researchDir, "goal.md"), "# Goal");
     fs.writeFileSync(path.join(researchDir, "goal.sh"), "#!/usr/bin/env bash\n");
 

@@ -6,8 +6,8 @@ import { createServer, type Server, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { extractResearchName } from "../persistence/research-journal.ts";
-import { researchJournalPath } from "../persistence/research-paths.ts";
+import { extractResearchName } from "../persistence/research-journal-codec.ts";
+import { activeResearch } from "../persistence/research-directory.ts";
 
 const TITLE_PLACEHOLDER = "__GOAL_TITLE__";
 const LOGO_PLACEHOLDER = "__GOAL_LOGO__";
@@ -61,7 +61,7 @@ export function createDashboardServer(): DashboardServerController {
   }
 
   function readJsonlContent(workDir: string): string {
-    return fs.readFileSync(researchJournalPath(workDir), "utf-8").trim();
+    return fs.readFileSync(activeResearch(workDir).paths.journal, "utf-8").trim();
   }
 
   function escapeHtml(text: string): string {
@@ -126,7 +126,7 @@ export function createDashboardServer(): DashboardServerController {
 
   function resolveServedFile(workDir: string, requestPath: string): string | null {
     if (requestPath === "/") return dashboardServerHtmlPath;
-    if (requestPath === "/goal.jsonl") return researchJournalPath(workDir);
+    if (requestPath === "/goal.jsonl") return activeResearch(workDir).paths.journal;
     return null;
   }
 
@@ -210,7 +210,7 @@ export function createDashboardServer(): DashboardServerController {
   }
 
   async function exportDashboard(ctx: ExtensionContext, workDir: string): Promise<void> {
-    const jsonlPath = researchJournalPath(workDir);
+    const jsonlPath = activeResearch(workDir).paths.journal;
 
     if (!fs.existsSync(jsonlPath)) {
       ctx.ui.notify("No goal.jsonl found — run some experiments first", "error");

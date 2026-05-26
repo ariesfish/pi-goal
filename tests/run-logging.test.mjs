@@ -5,9 +5,12 @@ import test from "node:test";
 import { tmpdir } from "node:os";
 
 import { recordRunResult } from "../extensions/pi-goal/run-result-workflow.ts";
-import { selectActiveResearch } from "../extensions/pi-goal/persistence/research-store.ts";
-import { researchJournalPath } from "../extensions/pi-goal/persistence/research-paths.ts";
+import { activeResearch, selectActiveResearch } from "../extensions/pi-goal/persistence/research-directory.ts";
 import { createResearchState } from "../extensions/pi-goal/domain/research-state.ts";
+
+function journalPath(projectDir) {
+  return activeResearch(projectDir).paths.journal;
+}
 
 function fakeDeps(projectDir, state, execCalls = []) {
   return {
@@ -45,7 +48,7 @@ test("run logging records a kept Run Result, commits workspace, and appends jour
   const execCalls = [];
   try {
     selectActiveResearch(projectDir, "default");
-    fs.writeFileSync(researchJournalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
+    fs.writeFileSync(journalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
     const state = createResearchState();
     state.name = "Speed";
     state.metricName = "total_ms";
@@ -69,7 +72,7 @@ test("run logging records a kept Run Result, commits workspace, and appends jour
       "git commit",
       "git rev-parse",
     ]);
-    const lines = fs.readFileSync(researchJournalPath(projectDir), "utf-8").trim().split("\n");
+    const lines = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n");
     assert.equal(lines.length, 2);
     assert.match(lines[1], /"description":"baseline"/);
   } finally {
@@ -94,7 +97,7 @@ test("run logging blocks keep when checks failed before mutating state", async (
 
     assert.equal(result.ok, false);
     assert.equal(state.results.length, 0);
-    assert.equal(fs.existsSync(researchJournalPath(projectDir)), false);
+    assert.equal(fs.existsSync(journalPath(projectDir)), false);
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
@@ -105,7 +108,7 @@ test("run logging journals and restores a rejected Run Result while preserving A
   const execCalls = [];
   try {
     selectActiveResearch(projectDir, "default");
-    fs.writeFileSync(researchJournalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
+    fs.writeFileSync(journalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
     const state = createResearchState();
     state.name = "Speed";
     state.metricName = "total_ms";
@@ -123,7 +126,7 @@ test("run logging journals and restores a rejected Run Result while preserving A
     assert.equal(result.ok, true);
     assert.equal(state.results.length, 1);
     assert.deepEqual(execCalls.map(([command, args]) => `${command} ${args[0]}`), ["bash -c"]);
-    const lines = fs.readFileSync(researchJournalPath(projectDir), "utf-8").trim().split("\n");
+    const lines = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n");
     assert.equal(lines.length, 2);
     const entry = JSON.parse(lines[1]);
     assert.equal(entry.status, "discard");
@@ -142,7 +145,7 @@ test("run logging rejects missing known secondary metrics before side effects", 
   const execCalls = [];
   try {
     selectActiveResearch(projectDir, "default");
-    fs.writeFileSync(researchJournalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
+    fs.writeFileSync(journalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
     const state = createResearchState();
     state.name = "Speed";
     state.metricName = "total_ms";
@@ -161,7 +164,7 @@ test("run logging rejects missing known secondary metrics before side effects", 
     assert.match(result.text, /Missing secondary metrics: compile_ms/);
     assert.equal(state.results.length, 0);
     assert.deepEqual(execCalls, []);
-    const lines = fs.readFileSync(researchJournalPath(projectDir), "utf-8").trim().split("\n");
+    const lines = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n");
     assert.equal(lines.length, 1);
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });

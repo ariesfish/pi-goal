@@ -3,11 +3,12 @@ import * as fs from "node:fs";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 
 import { createResearchState, type ResearchState } from "../domain/research-state.ts";
-import type { HookPayload, ResearchSnapshot } from "../execution/hooks.ts";
+import type { HookPayload } from "../execution/hooks.ts";
+import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
 import { resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
 import { readResearchFileContract } from "../persistence/research-files.ts";
-import { researchJournalPath } from "../persistence/research-paths.ts";
-import { readLastRunResult, selectActiveResearch } from "../persistence/research-store.ts";
+import { readLastRunResult } from "../persistence/research-journal-reader.ts";
+import { activeResearch, selectActiveResearch } from "../persistence/research-directory.ts";
 import { clearResearchPhase, deactivateResearch, type ResearchProtocolOptions } from "../protocol/research-phase.ts";
 import { startResearchActivation } from "../protocol/research-protocol.ts";
 import type { ResumeAdapter } from "../protocol/resume-scheduler.ts";
@@ -133,9 +134,9 @@ function selectResearch(ctx: ExtensionContext, deps: GoalCommandDeps, trimmedArg
     return;
   }
   const workDir = resolveWorkDir(ctx.cwd);
-  const selectedResearchId = selectActiveResearch(workDir, researchId);
+  const selectedResearch = selectActiveResearch(workDir, researchId);
   deps.reconstructState(ctx);
-  ctx.ui.notify(`Active research selected: ${selectedResearchId}`, "info");
+  ctx.ui.notify(`Active research selected: ${selectedResearch.id}`, "info");
 }
 
 function requestExperimentStart(ctx: ExtensionContext, deps: GoalCommandDeps, runtime: SessionRuntime): void {
@@ -151,7 +152,7 @@ function requestExperimentStart(ctx: ExtensionContext, deps: GoalCommandDeps, ru
 }
 
 function clearActiveResearchJournal(ctx: ExtensionContext, deps: GoalCommandDeps, runtime: SessionRuntime): void {
-  const jsonlPath = researchJournalPath(resolveWorkDir(ctx.cwd));
+  const jsonlPath = activeResearch(resolveWorkDir(ctx.cwd)).paths.journal;
   clearResearchPhase(runtime.loop);
   runtime.dashboardExpanded = false;
   runtime.lastRunChecks = null;

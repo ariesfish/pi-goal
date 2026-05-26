@@ -1,5 +1,5 @@
 import { validateResearchDryRun, type ResearchDryRunExecAdapter } from "./execution/research-dry-run.ts";
-import { validateResearchFiles } from "./persistence/research-file-validation.ts";
+import { validateResearchFiles } from "./persistence/research-files.ts";
 import {
   researchValidationResult,
   type ResearchValidationIssue,

@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 
-import { researchJournalPath } from "./research-paths.ts";
+import { activeResearch } from "./research-directory.ts";
 import type { RunResult } from "../domain/research-state.ts";
 
 export function runResultJournalEntry(runNumber: number, runResult: RunResult): Record<string, unknown> {
@@ -14,7 +14,7 @@ export function runResultJournalEntry(runNumber: number, runResult: RunResult): 
 
 export function appendRunResultToJournal(workDir: string, entry: Record<string, unknown>): string | null {
   try {
-    fs.appendFileSync(researchJournalPath(workDir), JSON.stringify(entry) + "\n");
+    fs.appendFileSync(activeResearch(workDir).paths.journal, JSON.stringify(entry) + "\n");
     return null;
   } catch (error) {
     return `⚠️ Failed to write goal.jsonl: ${error instanceof Error ? error.message : String(error)}`;

@@ -1,6 +1,6 @@
 import * as path from "node:path";
 
-import { isResearchStatePath } from "../persistence/research-paths.ts";
+import { isResearchStatePath } from "../persistence/research-directory.ts";
 
 export interface WorkspaceExecAdapter {
   exec(command: string, args: string[], options: { cwd?: string; timeout?: number }): Promise<{
