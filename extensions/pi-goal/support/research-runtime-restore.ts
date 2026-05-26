@@ -3,11 +3,11 @@ import * as fs from "node:fs";
 import { createResearchState, cloneResearchState, computeConfidence, type ResearchState } from "../domain/research-state.ts";
 import { resetResearchPhaseForAgentStart, type ResearchPhaseState } from "../protocol/research-phase.ts";
 import { syncResearchPhaseFromResearchFiles } from "../protocol/research-protocol.ts";
-import type { LogDetails, SessionRuntime } from "../support/runtime.ts";
-import { readRunLimit } from "./goal-config.ts";
-import { readResearchFileContract, type ResearchFileContract } from "./research-files.ts";
-import { researchJournalPath } from "./research-paths.ts";
-import { hydrateResearchStateFromJournal } from "./research-store.ts";
+import type { LogDetails, SessionRuntime } from "./runtime.ts";
+import { readRunLimit } from "../persistence/goal-config.ts";
+import { readResearchFileContract, type ResearchFileContract } from "../persistence/research-files.ts";
+import { activeResearch } from "../persistence/research-directory.ts";
+import { hydrateResearchStateFromJournal } from "../persistence/research-state-hydration.ts";
 
 export interface SessionBranchMessageEntry {
   type: string;
@@ -57,7 +57,7 @@ export function restoreActiveResearchRuntime(options: {
 }
 
 function hydrateRuntimeStateFromJournal(state: ResearchState, workDir: string): boolean {
-  const jsonlPath = researchJournalPath(workDir);
+  const jsonlPath = activeResearch(workDir).paths.journal;
   try {
     if (!fs.existsSync(jsonlPath)) return false;
     return hydrateResearchStateFromJournal(state, fs.readFileSync(jsonlPath, "utf-8"));

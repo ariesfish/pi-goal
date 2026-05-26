@@ -2,7 +2,8 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import { Text } from "@mariozechner/pi-tui";
 import { resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
 import { formatMetricValue } from "../ui/metric-format.ts";
-import type { HookPayload, ResearchSnapshot } from "../execution/hooks.ts";
+import type { HookPayload } from "../execution/hooks.ts";
+import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
 import { onResearchRunLogged } from "../protocol/research-phase.ts";
 import type { SessionRuntime, LogDetails } from "../support/runtime.ts";
 import { LogParams } from "../support/schema.ts";
