@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import test from "node:test";
 
 import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
-import { executeExperimentConfigWorkflow } from "../../extensions/pi-goal/experiment-config-workflow.ts";
+import { executeExperimentConfigWorkflow } from "../../extensions/pi-goal/workflows/research-workflow.ts";
 import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 
 function tempProject() {

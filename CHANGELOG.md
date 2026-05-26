@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0] - 2026-05-26
+
+### Changed
+
+- Consolidated pi-goal's main Research workflow into `extensions/pi-goal/workflows/research-workflow.ts`.
+- Removed the old root-level workflow modules and updated tools/tests to import the unified workflow module directly.
+
 ## [0.3.0] - 2026-05-26
 
 ### Changed

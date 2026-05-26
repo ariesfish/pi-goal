@@ -12,7 +12,7 @@ import {
   isBetter,
   type ResearchState,
 } from "../domain/research-state.ts";
-import { recordRunResult } from "../run-result-workflow.ts";
+import { recordRunResult } from "../workflows/research-workflow.ts";
 
 export interface LogExperimentToolDeps {
   getRuntime(ctx: ExtensionContext): SessionRuntime;

@@ -7,7 +7,7 @@ import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { InitParams } from "../support/schema.ts";
 import type { ResearchState } from "../domain/research-state.ts";
-import { executeExperimentConfigWorkflow } from "../experiment-config-workflow.ts";
+import { executeExperimentConfigWorkflow } from "../workflows/research-workflow.ts";
 
 export interface InitExperimentToolDeps {
   getRuntime(ctx: ExtensionContext): SessionRuntime;

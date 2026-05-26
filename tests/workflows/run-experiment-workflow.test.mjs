@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import test from "node:test";
 
 import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
-import { executeRunExperimentWorkflow } from "../../extensions/pi-goal/run-experiment-workflow.ts";
+import { executeRunExperimentWorkflow } from "../../extensions/pi-goal/workflows/research-workflow.ts";
 import { onResearchRunFinished } from "../../extensions/pi-goal/protocol/research-phase.ts";
 import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 

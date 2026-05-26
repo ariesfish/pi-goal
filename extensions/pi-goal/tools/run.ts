@@ -12,7 +12,7 @@ import {
 } from "../ui/run-result-renderer.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { RunParams } from "../support/schema.ts";
-import { executeRunExperimentWorkflow } from "../run-experiment-workflow.ts";
+import { executeRunExperimentWorkflow } from "../workflows/research-workflow.ts";
 
 export interface RunExperimentToolDeps {
   getRuntime(ctx: ExtensionContext): SessionRuntime;

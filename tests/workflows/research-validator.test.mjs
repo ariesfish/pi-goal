@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-import { validateResearch } from "../../extensions/pi-goal/research-validation-workflow.ts";
+import { validateResearch } from "../../extensions/pi-goal/workflows/research-workflow.ts";
 import { ensureActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 
 function writeResearchFiles(projectDir, metricName = "total_ms") {

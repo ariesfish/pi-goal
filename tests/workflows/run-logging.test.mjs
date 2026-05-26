@@ -4,7 +4,7 @@ import * as path from "node:path";
 import test from "node:test";
 import { tmpdir } from "node:os";
 
-import { recordRunResult } from "../../extensions/pi-goal/run-result-workflow.ts";
+import { recordRunResult } from "../../extensions/pi-goal/workflows/research-workflow.ts";
 import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 import { createResearchState } from "../../extensions/pi-goal/domain/research-state.ts";
 

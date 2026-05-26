@@ -7,7 +7,7 @@ import { ValidateResearchParams } from "../support/schema.ts";
 import {
   formatResearchValidationResult,
   validateResearch,
-} from "../research-validation-workflow.ts";
+} from "../workflows/research-workflow.ts";
 
 export function registerValidateResearchTool(pi: ExtensionAPI): void {
   pi.registerTool({

@@ -6,9 +6,11 @@ import { buildResearchSnapshot } from "../../extensions/pi-goal/domain/research-
 import { buildResearchSummaryFromState } from "../../extensions/pi-goal/domain/research-summary.ts";
 import { researchStateFromJournal } from "../../extensions/pi-goal/persistence/research-state-hydration.ts";
 import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
-import { executeExperimentConfigWorkflow } from "../../extensions/pi-goal/experiment-config-workflow.ts";
-import { executeRunExperimentWorkflow } from "../../extensions/pi-goal/run-experiment-workflow.ts";
-import { recordRunResult } from "../../extensions/pi-goal/run-result-workflow.ts";
+import {
+  executeExperimentConfigWorkflow,
+  executeRunExperimentWorkflow,
+  recordRunResult,
+} from "../../extensions/pi-goal/workflows/research-workflow.ts";
 import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
 
 import {
