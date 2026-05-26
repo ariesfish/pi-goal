@@ -1,15 +1,13 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
-import * as fs from "node:fs";
 
-import { readRunLimit, resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
-import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/research-workspace.ts";
-import type { HookPayload, ResearchSnapshot } from "../execution/hooks.ts";
-import { onResearchInitialized } from "../protocol/research-phase.ts";
-import { ensureResearchJournalPath } from "../persistence/research-paths.ts";
+import { resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
+import type { HookPayload } from "../execution/hooks.ts";
+import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { InitParams } from "../support/schema.ts";
-import { cloneResearchState, type ResearchState } from "../domain/research-state.ts";
+import type { ResearchState } from "../domain/research-state.ts";
+import { executeExperimentConfigWorkflow } from "../experiment-config-workflow.ts";
 
 export interface InitExperimentToolDeps {
   getRuntime(ctx: ExtensionContext): SessionRuntime;
@@ -78,7 +76,6 @@ function registerExperimentConfigTool(
 
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const runtime = deps.getRuntime(ctx);
-      const state = runtime.state;
 
       const workDirError = validateWorkDir(ctx.cwd);
       if (workDirError) {
@@ -88,90 +85,26 @@ function registerExperimentConfigTool(
         };
       }
 
-      const startsLaterExperiment = state.results.length > 0;
-      if (copy.name === "init_goal" && startsLaterExperiment) {
-        return {
-          content: [{
-            type: "text",
-            text: "❌ init_goal initializes the active research and first experiment only. The active research already has runs; use start_goal to open a new experiment with a fresh baseline.",
-          }],
-          details: {},
-        };
-      }
-
       const workDir = resolveWorkDir(ctx.cwd);
-      const dirtyCheck = await checkResearchWorkspace(pi, workDir);
-      const dirtyBlock = formatWorkspaceSafetyError(dirtyCheck);
-      if (dirtyBlock) {
-        return {
-          content: [{ type: "text", text: `❌ ${dirtyBlock}` }],
-          details: {},
-        };
-      }
+      const result = await executeExperimentConfigWorkflow(params, {
+        pi,
+        runtime,
+        workDir,
+        ctxCwd: ctx.cwd,
+        kind: copy.name,
+        title: copy.title,
+        fireHook: deps.fireHook,
+        readLastRun: deps.readLastRun,
+        buildResearchSnapshot: deps.buildResearchSnapshot,
+        broadcastDashboardUpdate: deps.broadcastDashboardUpdate,
+      });
 
-      state.name = params.name;
-      state.metricName = params.metric_name;
-      state.metricUnit = params.metric_unit ?? "";
-      if (params.direction === "lower" || params.direction === "higher") {
-        state.bestDirection = params.direction;
-      }
-      if (startsLaterExperiment) {
-        state.currentExperimentIndex++;
-      }
-      state.bestMetric = null;
-      state.secondaryMetrics = [];
-      state.confidence = null;
-      state.runLimit = readRunLimit(ctx.cwd);
-
-      try {
-        const jsonlPath = ensureResearchJournalPath(workDir);
-        const config = JSON.stringify({
-          type: "config",
-          name: state.name,
-          metricName: state.metricName,
-          metricUnit: state.metricUnit,
-          bestDirection: state.bestDirection,
-        });
-        if (fs.existsSync(jsonlPath)) {
-          fs.appendFileSync(jsonlPath, config + "\n");
-        } else {
-          fs.writeFileSync(jsonlPath, config + "\n");
-        }
-        deps.broadcastDashboardUpdate(workDir);
-      } catch (e) {
-        return {
-          content: [{
-            type: "text",
-            text: `⚠️ Failed to write goal.jsonl: ${e instanceof Error ? e.message : String(e)}`,
-          }],
-          details: {},
-        };
-      }
-
-      const wasInactive = !runtime.loop.mode;
-      onResearchInitialized(runtime.loop);
       deps.updateWidget(ctx);
+      if (result.ok && result.steer) pi.sendUserMessage(result.steer, { deliverAs: "steer" });
 
-      if (wasInactive) {
-        const steer = await deps.fireHook({
-          event: "before",
-          cwd: workDir,
-          next_run: state.results.length + 1,
-          last_run: deps.readLastRun(workDir),
-          research: deps.buildResearchSnapshot(state),
-        });
-        if (steer) pi.sendUserMessage(steer, { deliverAs: "steer" });
-      }
-
-      const experimentStartNote = startsLaterExperiment ? " (new experiment started — previous runs archived, new baseline needed)" : "";
-      const limitNote = state.runLimit !== null ? `\nRun limit: ${state.runLimit} (from goal.config.json)` : "";
-      const workDirNote = workDir !== ctx.cwd ? `\nWorking directory: ${workDir}` : "";
       return {
-        content: [{
-          type: "text",
-          text: `✅ ${copy.title}: "${state.name}"${experimentStartNote}\nMetric: ${state.metricName} (${state.metricUnit || "unitless"}, ${state.bestDirection} is better)${limitNote}${workDirNote}\nConfig written to goal.jsonl. Now run the baseline with run_goal.`,
-        }],
-        details: { state: cloneResearchState(state) },
+        content: [{ type: "text", text: result.text }],
+        details: result.ok ? { state: result.state } : {},
       };
     },
 
