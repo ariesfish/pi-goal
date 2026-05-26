@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0] - 2026-05-26
+
+### Changed
+
+- Organized the node test suite into focused subdirectories.
+- Added integration workflow tests for Research initialization, Experiment Starts, Run Result logging, hydration, and multi-Research isolation.
+- Added `test:finalize` coverage to CI for finalize script behavior.
+
 ## [0.1.0] - 2026-05-26
 
 ### Added

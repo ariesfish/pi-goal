@@ -13,3 +13,7 @@ Use the canonical triage label vocabulary: `needs-triage`, `needs-info`, `ready-
 ### Domain docs
 
 This is a single-context repo: read root `CONTEXT.md` and relevant `docs/adr/` files before domain-sensitive work. See `docs/agents/domain.md`.
+
+## Release hygiene
+
+When changing `package.json` version, update `CHANGELOG.md` in the same change with a matching `## [x.y.z]` section. The publish workflow requires the changelog section for the package version.
