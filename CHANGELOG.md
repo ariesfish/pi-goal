@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Renamed the npm package to `@ariesfish/pi-goal`.
 - Organized the node test suite into focused subdirectories.
 - Added integration workflow tests for Research initialization, Experiment Starts, Run Result logging, hydration, and multi-Research isolation.
 - Added `test:finalize` coverage to CI for finalize script behavior.

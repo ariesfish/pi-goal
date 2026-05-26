@@ -15,7 +15,7 @@ Use it for any measurable optimization target: test speed, bundle size, training
 ## Install
 
 ```bash
-pi install npm:pi-goal
+pi install npm:@ariesfish/pi-goal
 ```
 
 Manual install:
