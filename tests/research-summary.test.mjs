@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildResearchSummary } from "../extensions/pi-goal/domain/research-summary.ts";
-import { reconstructResearchStateFromJournal } from "../extensions/pi-goal/persistence/research-journal.ts";
+import { buildResearchSummaryFromState } from "../extensions/pi-goal/domain/research-summary.ts";
+import { researchStateFromJournal } from "../extensions/pi-goal/persistence/research-state-hydration.ts";
 
 test("research summary exposes current experiment baseline, best, status counts, and recent deltas", () => {
-  const state = reconstructResearchStateFromJournal([
+  const state = researchStateFromJournal([
     '{"type":"config","name":"S","metricName":"ms","metricUnit":"ms","bestDirection":"lower"}',
     '{"run":1,"commit":"a","metric":200,"status":"keep","description":"old base","timestamp":1,"metrics":{}}',
     '{"type":"config","name":"S","metricName":"ms","metricUnit":"ms","bestDirection":"lower"}',
@@ -14,7 +14,7 @@ test("research summary exposes current experiment baseline, best, status counts,
     '{"run":4,"commit":"d","metric":120,"status":"discard","description":"worse","timestamp":4,"metrics":{},"asi":{"rollback_reason":"slow"}}',
   ].join("\n"));
 
-  const model = buildResearchSummary(state, { recentRunLimit: 3 });
+  const model = buildResearchSummaryFromState(state, { recentRunLimit: 3 });
 
   assert.equal(model.currentExperiment.runCount, 3);
   assert.deepEqual(model.currentExperiment.statusCounts, {

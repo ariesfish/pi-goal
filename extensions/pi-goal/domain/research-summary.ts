@@ -1,11 +1,10 @@
-import type { ReconstructedResearchState, ReconstructedRun } from "../persistence/research-journal.ts";
 import type { MetricDef, ResearchState, RunResult } from "../domain/research-state.ts";
 
-export type RunStatus = ReconstructedRun["status"];
+export type RunStatus = RunResult["status"];
 
 export type StatusCounts = Record<RunStatus, number>;
 
-type SourceRun = ReconstructedRun | RunResult;
+type SourceRun = RunResult;
 
 export interface ResearchRunSummary {
   source: SourceRun;
@@ -39,22 +38,6 @@ export interface ResearchSummary {
     baselineSecondary: Record<string, number>;
   };
   recentRuns: ResearchRunSummary[];
-}
-
-export function buildResearchSummary(
-  state: ReconstructedResearchState,
-  options: { recentRunLimit?: number } = {},
-): ResearchSummary {
-  return buildSummary({
-    name: state.name,
-    metricName: state.metricName,
-    metricUnit: state.metricUnit,
-    direction: state.bestDirection,
-    currentExperimentIndex: state.currentExperimentIndex,
-    results: state.results,
-    secondaryMetrics: state.secondaryMetrics,
-    confidence: null,
-  }, options);
 }
 
 export function buildResearchSummaryFromState(
@@ -139,8 +122,8 @@ function runSummary(run: SourceRun, runNumber: number, baselineMetric: number | 
   };
 }
 
-function runNumberFor(run: SourceRun, index: number): number {
-  return "run" in run && typeof run.run === "number" ? run.run : index + 1;
+function runNumberFor(_run: SourceRun, index: number): number {
+  return index + 1;
 }
 
 function baselineMetricFor(run: SourceRun, allRuns: SourceRun[]): number | null {

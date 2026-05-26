@@ -8,12 +8,12 @@ import {
   researchSummaryPathsFor,
   buildResearchCompactionSummary,
 } from "../extensions/pi-goal/support/compaction.ts";
-import { ensureActiveResearchDirectory } from "../extensions/pi-goal/persistence/research-directory.ts";
+import { ensureActiveResearch } from "../extensions/pi-goal/persistence/research-directory.ts";
 
 function withTempWorkDir(fn) {
   const dir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-compact-"));
   try {
-    fn(dir, ensureActiveResearchDirectory(dir));
+    fn(dir, ensureActiveResearch(dir).paths.directory);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

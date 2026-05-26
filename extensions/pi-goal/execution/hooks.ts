@@ -2,7 +2,8 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { hasResearchConfigHeader } from "../persistence/research-journal.ts";
+import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
+import { hasResearchConfigHeader } from "../persistence/research-journal-codec.ts";
 
 const TIMEOUT_MS = 30_000;
 const STDOUT_MAX_BYTES = 8 * 1024;
@@ -25,16 +26,6 @@ function truncateAtBoundary(buf: Buffer): Buffer {
 }
 
 export type HookStage = "before" | "after";
-
-export interface ResearchSnapshot {
-  metric_name: string;
-  metric_unit: string;
-  direction: "lower" | "higher";
-  baseline_metric: number | null;
-  best_metric: number | null;
-  run_count: number;
-  goal: string;
-}
 
 export interface BeforeHookPayload {
   event: "before";

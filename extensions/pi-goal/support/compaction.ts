@@ -8,16 +8,10 @@
  */
 
 import * as fs from "node:fs";
+import { researchStateFromJournal } from "../persistence/research-state-hydration.ts";
+import { activeResearch } from "../persistence/research-directory.ts";
 import {
-  reconstructResearchStateFromJournal,
-} from "../persistence/research-journal.ts";
-import {
-  researchIdeasPath,
-  researchJournalPath,
-  researchRulesPath,
-} from "../persistence/research-paths.ts";
-import {
-  buildResearchSummary,
+  buildResearchSummaryFromState,
   type ResearchSummary,
   type ResearchRunSummary,
 } from "../domain/research-summary.ts";
@@ -32,11 +26,12 @@ export interface ResearchSummaryPaths {
 }
 
 export function researchSummaryPathsFor(workDir: string): ResearchSummaryPaths {
+  const paths = activeResearch(workDir).paths;
   return {
     workDir,
-    jsonlPath: researchJournalPath(workDir),
-    mdPath: researchRulesPath(workDir),
-    ideasPath: researchIdeasPath(workDir),
+    jsonlPath: paths.journal,
+    mdPath: paths.rules,
+    ideasPath: paths.ideas,
   };
 }
 
@@ -58,8 +53,8 @@ export function buildResearchCompactionSummary(paths: ResearchSummaryPaths): str
 }
 
 function loadSummary(jsonlPath: string): ResearchSummary {
-  return buildResearchSummary(
-    reconstructResearchStateFromJournal(readFileOrEmpty(jsonlPath)),
+  return buildResearchSummaryFromState(
+    researchStateFromJournal(readFileOrEmpty(jsonlPath)),
     { recentRunLimit: RECENT_RUN_LIMIT },
   );
 }

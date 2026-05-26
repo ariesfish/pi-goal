@@ -31,7 +31,7 @@ import { resolveGoalShortcuts } from "./support/shortcuts.ts";
 import { resolveWorkDir } from "./persistence/goal-config.ts";
 
 import { checkResearchWorkspace } from "./workspace/research-workspace.ts";
-import { researchJournalPath } from "./persistence/research-paths.ts";
+import { activeResearch } from "./persistence/research-directory.ts";
 import {
   createRuntimeStore,
   type SessionRuntime,
@@ -44,10 +44,8 @@ import { registerValidateResearchTool } from "./tools/validate.ts";
 import { registerInitExperimentTool, registerStartExperimentTool } from "./tools/init.ts";
 import { registerRunExperimentTool } from "./tools/run.ts";
 import { registerLogExperimentTool } from "./tools/log.ts";
-import {
-  buildResearchSnapshot,
-  readLastRunResult,
-} from "./persistence/research-store.ts";
+import { readLastRunResult } from "./persistence/research-journal-reader.ts";
+import { buildResearchSnapshot } from "./domain/research-snapshot.ts";
 import { readResearchFileContract } from "./persistence/research-files.ts";
 import {
   composeResearchCompactionResumeMessage,
@@ -56,7 +54,7 @@ import {
   shouldResumeResearchAfterCompact,
   shouldResumeResearchAfterTurn,
 } from "./protocol/research-protocol.ts";
-import { restoreActiveResearchRuntime } from "./persistence/research-runtime-restore.ts";
+import { restoreActiveResearchRuntime } from "./support/research-runtime-restore.ts";
 import { registerGoalCommand } from "./tools/goal-command.ts";
 
 // ---------------------------------------------------------------------------
@@ -139,7 +137,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 
   const fireHook = async (payload: HookPayload): Promise<string | null> => {
     const result = await runHook(payload);
-    appendHookLogEntryIfConfigured(researchJournalPath(payload.cwd), payload.event, result);
+    appendHookLogEntryIfConfigured(activeResearch(payload.cwd).paths.journal, payload.event, result);
     return steerMessageFor(payload.event, result);
   };
 
