@@ -4,7 +4,7 @@ import * as path from "node:path";
 import test from "node:test";
 import { tmpdir } from "node:os";
 
-import { appendHookLogEntryIfConfigured } from "../extensions/pi-goal/execution/hooks.ts";
+import { appendHookLogEntryIfConfigured } from "../../extensions/pi-goal/execution/hooks.ts";
 import {
   extractResearchName,
   hasResearchConfigHeader,
@@ -12,7 +12,7 @@ import {
   isRunResultEntry,
   parseJournalEntry,
   parseResearchJournalModel,
-} from "../extensions/pi-goal/persistence/research-journal-codec.ts";
+} from "../../extensions/pi-goal/persistence/research-journal-codec.ts";
 
 test("hook entries are skipped when identifying run entries", () => {
   const hookEntry = parseJournalEntry('{"type":"hook","stage":"before","exit_code":0}');
@@ -40,10 +40,11 @@ test("session name comes from the first config entry, not the first line", () =>
   assert.equal(extractResearchName(jsonl), "Hook-safe session");
 });
 
-test("parseResearchJournalModel ignores hooks and preserves run experiments", () => {
+test("parseResearchJournalModel ignores hooks and malformed journal lines while preserving run experiments", () => {
   const jsonl = [
     '{"type":"config","name":"Segmented session","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}',
     '{"type":"hook","stage":"before","exit_code":0}',
+    'not json',
     '{"run":1,"commit":"aaa1111","metric":10,"status":"keep","description":"baseline","timestamp":1,"metrics":{"compile_ms":4}}',
     '{"type":"hook","stage":"after","exit_code":0}',
     '{"type":"config","name":"Segmented session","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}',

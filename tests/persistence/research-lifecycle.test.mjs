@@ -4,13 +4,13 @@ import * as path from "node:path";
 import test from "node:test";
 import { tmpdir } from "node:os";
 
-import { readLastRunResult } from "../extensions/pi-goal/persistence/research-journal-reader.ts";
-import { hydrateResearchStateFromJournal } from "../extensions/pi-goal/persistence/research-state-hydration.ts";
-import { restoreActiveResearchRuntime } from "../extensions/pi-goal/support/research-runtime-restore.ts";
-import { activeResearch, selectActiveResearch } from "../extensions/pi-goal/persistence/research-directory.ts";
-import { buildResearchSnapshot } from "../extensions/pi-goal/domain/research-snapshot.ts";
-import { createResearchState } from "../extensions/pi-goal/domain/research-state.ts";
-import { createSessionRuntime } from "../extensions/pi-goal/support/runtime.ts";
+import { readLastRunResult } from "../../extensions/pi-goal/persistence/research-journal-reader.ts";
+import { hydrateResearchStateFromJournal } from "../../extensions/pi-goal/persistence/research-state-hydration.ts";
+import { restoreActiveResearchRuntime } from "../../extensions/pi-goal/support/research-runtime-restore.ts";
+import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
+import { buildResearchSnapshot } from "../../extensions/pi-goal/domain/research-snapshot.ts";
+import { createResearchState } from "../../extensions/pi-goal/domain/research-state.ts";
+import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
 
 function journalPath(projectDir) {
   return activeResearch(projectDir).paths.journal;

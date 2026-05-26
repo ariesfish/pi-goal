@@ -8,7 +8,7 @@ import {
   isGoalShCommand,
   parseMetricLines,
   runExperiment,
-} from "../extensions/pi-goal/execution/experiment-runner.ts";
+} from "../../extensions/pi-goal/execution/experiment-runner.ts";
 
 test("parseMetricLines accepts finite metric values and rejects pollution keys", () => {
   const metrics = parseMetricLines([
@@ -59,6 +59,33 @@ test("runExperiment returns structured details, parsed metrics, and checks resul
     assert.equal(result.details.parsedPrimary, 12);
     assert.deepEqual(result.details.parsedMetrics, { total_ms: 12, compile_ms: 3 });
     assert.match(result.llmOutput, /METRIC total_ms=12/);
+  } finally {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("runExperiment records timed out checks as a failed Run", async () => {
+  const workDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-runner-"));
+  try {
+    fs.writeFileSync(path.join(workDir, "goal.checks.sh"), "#!/usr/bin/env bash\necho slow\n");
+
+    const result = await runExperiment({
+      command: "printf 'METRIC total_ms=12\\n'",
+      workDir,
+      metricName: "total_ms",
+      metricUnit: "ms",
+      pi: {
+        async exec() {
+          return { code: null, killed: true, stdout: "", stderr: "timeout" };
+        },
+      },
+    });
+
+    assert.equal(result.details.passed, false);
+    assert.equal(result.details.crashed, true);
+    assert.equal(result.details.checksPass, false);
+    assert.equal(result.details.checksTimedOut, true);
+    assert.equal(result.details.parsedPrimary, 12);
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
   }

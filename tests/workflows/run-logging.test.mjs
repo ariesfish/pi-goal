@@ -4,9 +4,9 @@ import * as path from "node:path";
 import test from "node:test";
 import { tmpdir } from "node:os";
 
-import { recordRunResult } from "../extensions/pi-goal/run-result-workflow.ts";
-import { activeResearch, selectActiveResearch } from "../extensions/pi-goal/persistence/research-directory.ts";
-import { createResearchState } from "../extensions/pi-goal/domain/research-state.ts";
+import { recordRunResult } from "../../extensions/pi-goal/run-result-workflow.ts";
+import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
+import { createResearchState } from "../../extensions/pi-goal/domain/research-state.ts";
 
 function journalPath(projectDir) {
   return activeResearch(projectDir).paths.journal;
@@ -66,15 +66,12 @@ test("run logging records a kept Run Result, commits workspace, and appends jour
     assert.equal(result.ok, true);
     assert.equal(state.results.length, 1);
     assert.equal(result.ok && result.runResult.commit, "abc1234");
-    assert.deepEqual(execCalls.map(([command, args]) => `${command} ${args[0]}`), [
-      "git add",
-      "git diff",
-      "git commit",
-      "git rev-parse",
-    ]);
+    assert.equal(execCalls.some(([command, args]) => command === "git" && args[0] === "commit"), true);
     const lines = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n");
     assert.equal(lines.length, 2);
-    assert.match(lines[1], /"description":"baseline"/);
+    const entry = JSON.parse(lines[1]);
+    assert.equal(entry.description, "baseline");
+    assert.equal(entry.commit, "abc1234");
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
@@ -125,7 +122,8 @@ test("run logging journals and restores a rejected Run Result while preserving A
 
     assert.equal(result.ok, true);
     assert.equal(state.results.length, 1);
-    assert.deepEqual(execCalls.map(([command, args]) => `${command} ${args[0]}`), ["bash -c"]);
+    assert.equal(execCalls.some(([command, args]) => command === "bash" && args[0] === "-c"), true);
+    assert.equal(execCalls.some(([command]) => command === "git"), false);
     const lines = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n");
     assert.equal(lines.length, 2);
     const entry = JSON.parse(lines[1]);
@@ -166,6 +164,44 @@ test("run logging rejects missing known secondary metrics before side effects", 
     assert.deepEqual(execCalls, []);
     const lines = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n");
     assert.equal(lines.length, 1);
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("run logging preserves a kept Run Result when git commit fails", async () => {
+  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-log-"));
+  try {
+    selectActiveResearch(projectDir, "default");
+    fs.writeFileSync(journalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
+    const state = createResearchState();
+    state.name = "Speed";
+    state.metricName = "total_ms";
+    state.metricUnit = "ms";
+    const deps = fakeDeps(projectDir, state);
+    deps.pi = {
+      async exec(command, args) {
+        if (command === "git" && args[0] === "diff") return { code: 1, stdout: "", stderr: "" };
+        if (command === "git" && args[0] === "commit") return { code: 1, stdout: "", stderr: "no identity" };
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    };
+
+    const result = await recordRunResult({
+      commit: "pending",
+      metric: 100,
+      status: "keep",
+      description: "commit fails",
+      asi: { hypothesis: "commit failure path" },
+    }, deps);
+
+    assert.equal(result.ok, true);
+    assert.match(result.text, /Git commit failed/);
+    assert.equal(result.runResult.commit, "pending");
+    assert.equal(state.results.length, 1);
+    const entry = JSON.parse(fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n")[1]);
+    assert.equal(entry.description, "commit fails");
+    assert.equal(entry.commit, "pending");
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });
   }

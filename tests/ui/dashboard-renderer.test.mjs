@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { renderDashboardLines } from "../extensions/pi-goal/ui/dashboard-renderer.ts";
-import { createResearchState } from "../extensions/pi-goal/domain/research-state.ts";
+import { renderDashboardLines } from "../../extensions/pi-goal/ui/dashboard-renderer.ts";
+import { createResearchState } from "../../extensions/pi-goal/domain/research-state.ts";
 
 const plainTheme = {
   fg(_color, text) { return text; },

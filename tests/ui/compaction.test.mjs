@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import {
   researchSummaryPathsFor,
   buildResearchCompactionSummary,
-} from "../extensions/pi-goal/support/compaction.ts";
-import { ensureActiveResearch } from "../extensions/pi-goal/persistence/research-directory.ts";
+} from "../../extensions/pi-goal/support/compaction.ts";
+import { ensureActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 
 function withTempWorkDir(fn) {
   const dir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-compact-"));

@@ -4,10 +4,10 @@ import * as path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-import { createSessionRuntime } from "../extensions/pi-goal/support/runtime.ts";
-import { executeRunExperimentWorkflow } from "../extensions/pi-goal/run-experiment-workflow.ts";
-import { onResearchRunFinished } from "../extensions/pi-goal/protocol/research-phase.ts";
-import { activeResearch, selectActiveResearch } from "../extensions/pi-goal/persistence/research-directory.ts";
+import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
+import { executeRunExperimentWorkflow } from "../../extensions/pi-goal/run-experiment-workflow.ts";
+import { onResearchRunFinished } from "../../extensions/pi-goal/protocol/research-phase.ts";
+import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 
 function tempProject() {
   return fs.mkdtempSync(path.join(tmpdir(), "pi-goal-run-workflow-"));

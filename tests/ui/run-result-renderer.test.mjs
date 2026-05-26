@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildRunExperimentResponseText } from "../extensions/pi-goal/ui/run-result-renderer.ts";
+import { buildRunExperimentResponseText } from "../../extensions/pi-goal/ui/run-result-renderer.ts";
 
 function details(overrides = {}) {
   return {

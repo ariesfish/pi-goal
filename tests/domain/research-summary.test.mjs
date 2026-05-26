@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildResearchSummaryFromState } from "../extensions/pi-goal/domain/research-summary.ts";
-import { researchStateFromJournal } from "../extensions/pi-goal/persistence/research-state-hydration.ts";
+import { buildResearchSummaryFromState } from "../../extensions/pi-goal/domain/research-summary.ts";
+import { researchStateFromJournal } from "../../extensions/pi-goal/persistence/research-state-hydration.ts";
 
 test("research summary exposes current experiment baseline, best, status counts, and recent deltas", () => {
   const state = researchStateFromJournal([

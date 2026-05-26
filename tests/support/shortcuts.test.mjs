@@ -9,8 +9,8 @@ import {
   DEFAULT_FULLSCREEN_DASHBOARD_SHORTCUT,
   DEFAULT_TOGGLE_DASHBOARD_SHORTCUT,
   resolveGoalShortcuts,
-} from "../extensions/pi-goal/support/shortcuts.ts";
-import goalExtension from "../extensions/pi-goal/index.ts";
+} from "../../extensions/pi-goal/support/shortcuts.ts";
+import goalExtension from "../../extensions/pi-goal/index.ts";
 
 test("goal shortcuts default to the documented bindings when config is absent", async () => {
   const agentDir = await mkdtemp(join(tmpdir(), "pi-goal-test-"));

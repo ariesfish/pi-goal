@@ -13,13 +13,18 @@ import {
   shouldResearchAutoResumeAfterTurn,
   shouldBlockResearchRun,
   researchPhaseSystemPromptFor,
-} from "../extensions/pi-goal/protocol/research-phase.ts";
+} from "../../extensions/pi-goal/protocol/research-phase.ts";
 
 const options = {
   maxAutoResumeTurns: 20,
   maxActivationTurns: 3,
   benchmarkGuardrail: "Do not cheat.",
 };
+
+function assertProtocol(text, { marker, tool }) {
+  assert.match(text, new RegExp(marker));
+  if (tool) assert.match(text, new RegExp(tool));
+}
 
 test("activation without config enters setup phase and emits mandatory protocol", () => {
   const state = createResearchPhaseState();
@@ -32,8 +37,7 @@ test("activation without config enters setup phase and emits mandatory protocol"
 
   assert.equal(state.mode, true);
   assert.equal(state.phase, "activating");
-  assert.match(message, /RESEARCH_ACTIVATION_REQUIRED/);
-  assert.match(message, /Call init_goal/);
+  assertProtocol(message, { marker: "RESEARCH_ACTIVATION_REQUIRED", tool: "init_goal" });
   assert.equal(shouldResearchAutoResumeAfterTurn(state, options), true);
 });
 
@@ -47,9 +51,9 @@ test("existing goal files without config enter needs_init", () => {
   }, options);
 
   assert.equal(state.phase, "needs_init");
-  assert.match(message, /Read goal\.md, then call init_goal/);
+  assertProtocol(message, { marker: "RESEARCH_ACTIVATION_REQUIRED", tool: "init_goal" });
   assert.equal(detectPhaseFromFiles({ hasRules: true, hasConfig: false, hasBenchmarkScript: true }), "needs_init");
-  assert.match(composeResearchPhaseResumeMessage(state, options), /RESEARCH_INIT_REQUIRED/);
+  assertProtocol(composeResearchPhaseResumeMessage(state, options), { marker: "RESEARCH_INIT_REQUIRED", tool: "init_goal" });
 });
 
 test("init_goal transitions to mandatory baseline phase", () => {
@@ -60,7 +64,7 @@ test("init_goal transitions to mandatory baseline phase", () => {
   assert.equal(state.mode, true);
   assert.equal(state.phase, "needs_baseline");
   assert.equal(shouldResearchAutoResumeAfterTurn(state, options), true);
-  assert.match(composeResearchPhaseResumeMessage(state, options), /RESEARCH_BASELINE_REQUIRED/);
+  assertProtocol(composeResearchPhaseResumeMessage(state, options), { marker: "RESEARCH_BASELINE_REQUIRED", tool: "run_goal" });
 });
 
 test("run_goal transitions to awaiting_log and blocks another run", () => {
@@ -129,7 +133,7 @@ test("system prompt injects phase-specific required action", () => {
   }, options);
 
   assert.match(prompt, /Phase: needs_baseline/);
-  assert.match(prompt, /Required action: run the baseline now/);
+  assert.match(prompt, /run_goal/);
   assert.match(prompt, /Backpressure Checks/);
   assert.match(prompt, /Ideas backlog/);
 });

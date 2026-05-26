@@ -12,11 +12,11 @@ import {
   shouldResumeResearchAfterTurn,
   startResearchActivation,
   syncResearchPhaseFromResearchFiles,
-} from "../extensions/pi-goal/protocol/research-protocol.ts";
-import { readResearchFileContract } from "../extensions/pi-goal/persistence/research-files.ts";
-import { createResearchPhaseState, onResearchRunFinished } from "../extensions/pi-goal/protocol/research-phase.ts";
-import { createSessionRuntime } from "../extensions/pi-goal/support/runtime.ts";
-import { ensureActiveResearch } from "../extensions/pi-goal/persistence/research-directory.ts";
+} from "../../extensions/pi-goal/protocol/research-protocol.ts";
+import { readResearchFileContract } from "../../extensions/pi-goal/persistence/research-files.ts";
+import { createResearchPhaseState, onResearchRunFinished } from "../../extensions/pi-goal/protocol/research-phase.ts";
+import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
+import { ensureActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 
 const options = {
   maxAutoResumeTurns: 20,

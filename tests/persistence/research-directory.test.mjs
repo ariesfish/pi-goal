@@ -9,7 +9,7 @@ import {
   ensureActiveResearch,
   sanitizeResearchId,
   selectActiveResearch,
-} from "../extensions/pi-goal/persistence/research-directory.ts";
+} from "../../extensions/pi-goal/persistence/research-directory.ts";
 
 test("Research Directory exposes active Research identity and paths", () => {
   const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-research-dir-"));
