@@ -16,7 +16,7 @@ import {
 import { readResearchFileContract } from "../extensions/pi-goal/persistence/research-files.ts";
 import { createResearchPhaseState, onResearchRunFinished } from "../extensions/pi-goal/protocol/research-phase.ts";
 import { createSessionRuntime } from "../extensions/pi-goal/support/runtime.ts";
-import { ensureActiveResearchDirectory } from "../extensions/pi-goal/persistence/research-directory.ts";
+import { ensureActiveResearch } from "../extensions/pi-goal/persistence/research-directory.ts";
 
 const options = {
   maxAutoResumeTurns: 20,
@@ -27,7 +27,7 @@ const options = {
 test("activation protocol enters needs_init when rules and script exist without config", () => {
   const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-activation-"));
   try {
-    const researchDir = ensureActiveResearchDirectory(projectDir);
+    const researchDir = ensureActiveResearch(projectDir).paths.directory;
     fs.writeFileSync(path.join(researchDir, "goal.md"), "# Goal\n");
     fs.writeFileSync(path.join(researchDir, "goal.sh"), "#!/usr/bin/env bash\n");
     const contract = readResearchFileContract(projectDir);
@@ -46,7 +46,7 @@ test("activation protocol enters needs_init when rules and script exist without 
 test("activation protocol composes kickoff and notification from file contract", () => {
   const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-activation-"));
   try {
-    const researchDir = ensureActiveResearchDirectory(projectDir);
+    const researchDir = ensureActiveResearch(projectDir).paths.directory;
     fs.writeFileSync(path.join(researchDir, "goal.md"), "# Goal\n");
     fs.writeFileSync(path.join(researchDir, "goal.sh"), "#!/usr/bin/env bash\n");
     const contract = readResearchFileContract(projectDir);
