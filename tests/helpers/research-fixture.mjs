@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { tmpdir } from "node:os";
 
 import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
+export { activeResearch };
 import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
 
 export async function withTempResearch(prefix, fn, options = {}) {
@@ -28,7 +29,7 @@ export function readJournalEntries(workDir) {
   return content.split("\n").map((line) => JSON.parse(line));
 }
 
-export function writeConfigEntry(workDir, overrides = {}) {
+export function appendConfigEntry(workDir, overrides = {}) {
   const entry = {
     type: "config",
     name: "Speed",
@@ -88,6 +89,10 @@ export function createFakePiExec(handler = {}) {
       },
     },
   };
+}
+
+export function tempProject(prefix = "pi-goal") {
+  return fs.mkdtempSync(path.join(tmpdir(), `${prefix}-`));
 }
 
 export function assertNoJournal(workDir) {

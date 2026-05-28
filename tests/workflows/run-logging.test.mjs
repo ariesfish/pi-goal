@@ -1,28 +1,24 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import * as path from "node:path";
 import test from "node:test";
-import { tmpdir } from "node:os";
 
 import { recordRunResult } from "../../extensions/pi-goal/workflows/research-workflow.ts";
-import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
+import { selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 import { createResearchState } from "../../extensions/pi-goal/domain/research-state.ts";
+import {
+  journalPath,
+  tempProject,
+  appendConfigEntry,
+  createFakePiExec,
+} from "../helpers/research-fixture.mjs";
 
-function journalPath(projectDir) {
-  return activeResearch(projectDir).paths.journal;
-}
-
-function fakeDeps(projectDir, state, execCalls = []) {
+function fakeDeps(projectDir, state, overrides = {}) {
+  const { calls, pi } = createFakePiExec({
+    "git diff": () => ({ code: 1, stdout: "", stderr: "" }),
+  });
   return {
-    pi: {
-      async exec(command, args) {
-        execCalls.push([command, args]);
-        if (command === "git" && args[0] === "diff") return { code: 1, stdout: "", stderr: "" };
-        if (command === "git" && args[0] === "commit") return { code: 0, stdout: "[main abc1234] kept\n", stderr: "" };
-        if (command === "git" && args[0] === "rev-parse") return { code: 0, stdout: "abc1234\n", stderr: "" };
-        return { code: 0, stdout: "", stderr: "" };
-      },
-    },
+    _calls: calls,
+    pi,
     workDir: projectDir,
     state,
     lastRunChecks: null,
@@ -40,20 +36,21 @@ function fakeDeps(projectDir, state, execCalls = []) {
       };
     },
     broadcastDashboardUpdate() {},
+    ...overrides,
   };
 }
 
 test("run logging records a kept Run Result, commits workspace, and appends journal", async () => {
-  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-log-"));
-  const execCalls = [];
+  const projectDir = tempProject("pi-goal-log");
   try {
     selectActiveResearch(projectDir, "default");
-    fs.writeFileSync(journalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
+    appendConfigEntry(projectDir);
     const state = createResearchState();
     state.name = "Speed";
     state.metricName = "total_ms";
     state.metricUnit = "ms";
 
+    const deps = fakeDeps(projectDir, state);
     const result = await recordRunResult({
       commit: "pending",
       metric: 100,
@@ -61,12 +58,12 @@ test("run logging records a kept Run Result, commits workspace, and appends jour
       description: "baseline",
       metrics: { compile_ms: 50 },
       asi: { hypothesis: "baseline" },
-    }, fakeDeps(projectDir, state, execCalls));
+    }, deps);
 
     assert.equal(result.ok, true);
     assert.equal(state.results.length, 1);
     assert.equal(result.ok && result.runResult.commit, "abc1234");
-    assert.equal(execCalls.some(([command, args]) => command === "git" && args[0] === "commit"), true);
+    assert.equal(deps._calls.some(([command, args]) => command === "git" && args[0] === "commit"), true);
     const lines = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n");
     assert.equal(lines.length, 2);
     const entry = JSON.parse(lines[1]);
@@ -78,19 +75,19 @@ test("run logging records a kept Run Result, commits workspace, and appends jour
 });
 
 test("run logging blocks keep when checks failed before mutating state", async () => {
-  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-log-"));
+  const projectDir = tempProject("pi-goal-log");
   try {
     selectActiveResearch(projectDir, "default");
     const state = createResearchState();
-    const deps = fakeDeps(projectDir, state);
-    deps.lastRunChecks = { pass: false, output: "nope", duration: 0.1 };
 
     const result = await recordRunResult({
       commit: "pending",
       metric: 100,
       status: "keep",
       description: "bad keep",
-    }, deps);
+    }, fakeDeps(projectDir, state, {
+      lastRunChecks: { pass: false, output: "nope", duration: 0.1 },
+    }));
 
     assert.equal(result.ok, false);
     assert.equal(state.results.length, 0);
@@ -101,16 +98,16 @@ test("run logging blocks keep when checks failed before mutating state", async (
 });
 
 test("run logging journals and restores a rejected Run Result while preserving ASI", async () => {
-  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-log-"));
-  const execCalls = [];
+  const projectDir = tempProject("pi-goal-log");
   try {
     selectActiveResearch(projectDir, "default");
-    fs.writeFileSync(journalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
+    appendConfigEntry(projectDir);
     const state = createResearchState();
     state.name = "Speed";
     state.metricName = "total_ms";
     state.metricUnit = "ms";
 
+    const deps = fakeDeps(projectDir, state);
     const result = await recordRunResult({
       commit: "pending",
       metric: 120,
@@ -118,12 +115,12 @@ test("run logging journals and restores a rejected Run Result while preserving A
       description: "try cache",
       metrics: { compile_ms: 70 },
       asi: { hypothesis: "cache lookup", rollback_reason: "slower", next_action_hint: "try pooling" },
-    }, fakeDeps(projectDir, state, execCalls));
+    }, deps);
 
     assert.equal(result.ok, true);
     assert.equal(state.results.length, 1);
-    assert.equal(execCalls.some(([command, args]) => command === "bash" && args[0] === "-c"), true);
-    assert.equal(execCalls.some(([command]) => command === "git"), false);
+    assert.equal(deps._calls.some(([command, args]) => command === "bash" && args[0] === "-c"), true);
+    assert.equal(deps._calls.some(([command]) => command === "git"), false);
     const lines = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n");
     assert.equal(lines.length, 2);
     const entry = JSON.parse(lines[1]);
@@ -139,29 +136,29 @@ test("run logging journals and restores a rejected Run Result while preserving A
 });
 
 test("run logging rejects missing known secondary metrics before side effects", async () => {
-  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-log-"));
-  const execCalls = [];
+  const projectDir = tempProject("pi-goal-log");
   try {
     selectActiveResearch(projectDir, "default");
-    fs.writeFileSync(journalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
+    appendConfigEntry(projectDir);
     const state = createResearchState();
     state.name = "Speed";
     state.metricName = "total_ms";
     state.metricUnit = "ms";
     state.secondaryMetrics = [{ name: "compile_ms", unit: "ms" }];
 
+    const deps = fakeDeps(projectDir, state);
     const result = await recordRunResult({
       commit: "pending",
       metric: 100,
       status: "discard",
       description: "missing secondary",
       metrics: {},
-    }, fakeDeps(projectDir, state, execCalls));
+    }, deps);
 
     assert.equal(result.ok, false);
     assert.match(result.text, /Missing secondary metrics: compile_ms/);
     assert.equal(state.results.length, 0);
-    assert.deepEqual(execCalls, []);
+    assert.deepEqual(deps._calls, []);
     const lines = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n");
     assert.equal(lines.length, 1);
   } finally {
@@ -170,22 +167,14 @@ test("run logging rejects missing known secondary metrics before side effects", 
 });
 
 test("run logging preserves a kept Run Result when git commit fails", async () => {
-  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-log-"));
+  const projectDir = tempProject("pi-goal-log");
   try {
     selectActiveResearch(projectDir, "default");
-    fs.writeFileSync(journalPath(projectDir), '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
+    appendConfigEntry(projectDir);
     const state = createResearchState();
     state.name = "Speed";
     state.metricName = "total_ms";
     state.metricUnit = "ms";
-    const deps = fakeDeps(projectDir, state);
-    deps.pi = {
-      async exec(command, args) {
-        if (command === "git" && args[0] === "diff") return { code: 1, stdout: "", stderr: "" };
-        if (command === "git" && args[0] === "commit") return { code: 1, stdout: "", stderr: "no identity" };
-        return { code: 0, stdout: "", stderr: "" };
-      },
-    };
 
     const result = await recordRunResult({
       commit: "pending",
@@ -193,7 +182,15 @@ test("run logging preserves a kept Run Result when git commit fails", async () =
       status: "keep",
       description: "commit fails",
       asi: { hypothesis: "commit failure path" },
-    }, deps);
+    }, fakeDeps(projectDir, state, {
+      pi: {
+        async exec(command, args) {
+          if (command === "git" && args[0] === "diff") return { code: 1, stdout: "", stderr: "" };
+          if (command === "git" && args[0] === "commit") return { code: 1, stdout: "", stderr: "no identity" };
+          return { code: 0, stdout: "", stderr: "" };
+        },
+      },
+    }));
 
     assert.equal(result.ok, true);
     assert.match(result.text, /Git commit failed/);

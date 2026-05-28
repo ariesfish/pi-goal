@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { tmpdir } from "node:os";
 import test from "node:test";
 
 import { validateResearch } from "../../extensions/pi-goal/workflows/research-workflow.ts";
 import { ensureActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
+import { tempProject } from "../helpers/research-fixture.mjs";
 
 function writeResearchFiles(projectDir, metricName = "total_ms") {
   const researchDir = ensureActiveResearch(projectDir).paths.directory;
@@ -21,7 +21,7 @@ function writeResearchFiles(projectDir, metricName = "total_ms") {
 }
 
 test("validator reports missing primary metric from dry run", async () => {
-  const dir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-validator-"));
+  const dir = tempProject("pi-goal-validator");
   try {
     writeResearchFiles(dir);
 
@@ -44,7 +44,7 @@ test("validator reports missing primary metric from dry run", async () => {
 });
 
 test("validator accepts complete research with matching primary metric", async () => {
-  const dir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-validator-"));
+  const dir = tempProject("pi-goal-validator");
   try {
     writeResearchFiles(dir);
 
@@ -66,7 +66,7 @@ test("validator accepts complete research with matching primary metric", async (
 });
 
 test("validator reports missing Research Journal without running goal.sh", async () => {
-  const dir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-validator-"));
+  const dir = tempProject("pi-goal-validator");
   let execCount = 0;
   try {
     const researchDir = ensureActiveResearch(dir).paths.directory;

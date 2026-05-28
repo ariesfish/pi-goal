@@ -1,28 +1,23 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import * as path from "node:path";
-import { tmpdir } from "node:os";
 import test from "node:test";
 
 import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
 import { executeRunExperimentWorkflow } from "../../extensions/pi-goal/workflows/research-workflow.ts";
 import { onResearchRunFinished } from "../../extensions/pi-goal/protocol/research-phase.ts";
-import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
-
-function tempProject() {
-  return fs.mkdtempSync(path.join(tmpdir(), "pi-goal-run-workflow-"));
-}
+import { selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
+import {
+  tempProject,
+  activeResearch,
+  createFakePiExec,
+} from "../helpers/research-fixture.mjs";
 
 function piExec() {
-  return {
-    async exec() {
-      return { code: 0, killed: false, stdout: "", stderr: "" };
-    },
-  };
+  return createFakePiExec().pi;
 }
 
 test("run experiment workflow blocks a second Run until the previous Run Result is logged", async () => {
-  const workDir = tempProject();
+  const workDir = tempProject("pi-goal-run-workflow");
   try {
     const runtime = createSessionRuntime();
     onResearchRunFinished(runtime.loop, {
@@ -51,7 +46,7 @@ test("run experiment workflow blocks a second Run until the previous Run Result 
 });
 
 test("run experiment workflow enforces goal.sh when a Research script exists", async () => {
-  const workDir = tempProject();
+  const workDir = tempProject("pi-goal-run-workflow");
   try {
     const runtime = createSessionRuntime();
     runtime.state.metricName = "total_ms";
@@ -74,7 +69,7 @@ test("run experiment workflow enforces goal.sh when a Research script exists", a
 });
 
 test("run experiment workflow runs command, updates runtime, and enters awaiting_log", async () => {
-  const workDir = tempProject();
+  const workDir = tempProject("pi-goal-run-workflow");
   try {
     const runtime = createSessionRuntime();
     runtime.state.metricName = "total_ms";

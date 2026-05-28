@@ -1,27 +1,26 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
-import * as path from "node:path";
-import { tmpdir } from "node:os";
 import test from "node:test";
 
 import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
 import { executeExperimentConfigWorkflow } from "../../extensions/pi-goal/workflows/research-workflow.ts";
-import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
+import { selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
+import {
+  tempProject,
+  appendConfigEntry,
+  activeResearch,
+  createFakePiExec,
+} from "../helpers/research-fixture.mjs";
 
-function tempProject() {
-  const dir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-experiment-config-"));
+function setupProject() {
+  const dir = tempProject("pi-goal-experiment-config");
   selectActiveResearch(dir, "default");
   return dir;
 }
 
 function deps(workDir, runtime, overrides = {}) {
   return {
-    pi: {
-      async exec(command, args) {
-        if (command === "git" && args[0] === "status") return { code: 0, stdout: "", stderr: "" };
-        return { code: 0, stdout: "", stderr: "" };
-      },
-    },
+    pi: createFakePiExec().pi,
     runtime,
     workDir,
     ctxCwd: workDir,
@@ -46,7 +45,7 @@ function deps(workDir, runtime, overrides = {}) {
 }
 
 test("experiment config workflow initializes Research and writes the first Experiment config", async () => {
-  const workDir = tempProject();
+  const workDir = setupProject();
   try {
     const runtime = createSessionRuntime();
     let broadcasted = false;
@@ -77,7 +76,7 @@ test("experiment config workflow initializes Research and writes the first Exper
 });
 
 test("experiment config workflow rejects init_goal after the active Research has Run Results", async () => {
-  const workDir = tempProject();
+  const workDir = setupProject();
   try {
     const runtime = createSessionRuntime();
     runtime.state.results.push({
@@ -106,7 +105,7 @@ test("experiment config workflow rejects init_goal after the active Research has
 });
 
 test("experiment config workflow starts a later Experiment and resets comparison state", async () => {
-  const workDir = tempProject();
+  const workDir = setupProject();
   try {
     const runtime = createSessionRuntime();
     runtime.state.name = "Speed";
@@ -125,7 +124,7 @@ test("experiment config workflow starts a later Experiment and resets comparison
       experimentIndex: 0,
       confidence: null,
     });
-    fs.writeFileSync(activeResearch(workDir).paths.journal, '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}\n');
+    appendConfigEntry(workDir);
 
     const result = await executeExperimentConfigWorkflow({
       name: "Speed v2",

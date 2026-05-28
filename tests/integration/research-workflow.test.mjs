@@ -18,7 +18,7 @@ import {
   createRuntimeWithMetric,
   journalPath,
   readJournalEntries,
-  writeConfigEntry,
+  appendConfigEntry,
   appendRunEntry,
   withTempResearch,
 } from "../helpers/research-fixture.mjs";
@@ -119,7 +119,7 @@ test("start_goal opens a new Experiment whose baseline and best are isolated fro
         confidence: null,
       },
     );
-    writeConfigEntry(workDir, { name: "Speed", metricName: "total_ms", metricUnit: "ms", bestDirection: "lower" });
+    appendConfigEntry(workDir, { name: "Speed", metricName: "total_ms", metricUnit: "ms", bestDirection: "lower" });
     appendRunEntry(workDir, {
       run: 1,
       commit: "aaa1111",

@@ -2,22 +2,23 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import test from "node:test";
-import { tmpdir } from "node:os";
 
 import { readLastRunResult } from "../../extensions/pi-goal/persistence/research-journal-reader.ts";
 import { hydrateResearchStateFromJournal } from "../../extensions/pi-goal/persistence/research-state-hydration.ts";
 import { restoreActiveResearchRuntime } from "../../extensions/pi-goal/support/research-runtime-restore.ts";
-import { activeResearch, selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
+import { selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 import { buildResearchSnapshot } from "../../extensions/pi-goal/domain/research-snapshot.ts";
 import { createResearchState } from "../../extensions/pi-goal/domain/research-state.ts";
 import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
-
-function journalPath(projectDir) {
-  return activeResearch(projectDir).paths.journal;
-}
+import {
+  appendConfigEntry,
+  appendRunEntry,
+  tempProject,
+  journalPath,
+} from "../helpers/research-fixture.mjs";
 
 test("research lifecycle selects a sanitized active research and creates its directory", () => {
-  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-lifecycle-"));
+  const projectDir = tempProject("pi-goal-lifecycle");
   try {
     const selected = selectActiveResearch(projectDir, "Bundle Size!");
 
@@ -29,22 +30,63 @@ test("research lifecycle selects a sanitized active research and creates its dir
   }
 });
 
-test("research lifecycle hydrates state and reads the latest Run Result", () => {
-  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-lifecycle-"));
+test("research lifecycle hydrates Research config and Run Results from journal", () => {
+  const projectDir = tempProject("pi-goal-lifecycle");
   try {
     selectActiveResearch(projectDir, "default");
-    fs.writeFileSync(journalPath(projectDir), [
-      '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}',
-      '{"run":1,"commit":"aaa1111","metric":100,"status":"keep","description":"baseline","timestamp":1,"metrics":{"compile_ms":50}}',
-      '{"run":2,"commit":"bbb2222","metric":90,"status":"keep","description":"faster","timestamp":2,"metrics":{"compile_ms":45}}',
-    ].join("\n") + "\n");
+    appendConfigEntry(projectDir);
+    appendRunEntry(projectDir, {
+      run: 1,
+      commit: "aaa1111",
+      metric: 100,
+      description: "baseline",
+      timestamp: 1,
+      metrics: { compile_ms: 50 },
+    });
+    appendRunEntry(projectDir, {
+      run: 2,
+      commit: "bbb2222",
+      metric: 90,
+      description: "faster",
+      timestamp: 2,
+      metrics: { compile_ms: 45 },
+    });
 
     const state = createResearchState();
-    assert.equal(hydrateResearchStateFromJournal(state, fs.readFileSync(journalPath(projectDir), "utf-8")), true);
+    const hydrated = hydrateResearchStateFromJournal(state, fs.readFileSync(journalPath(projectDir), "utf-8"));
+
+    assert.equal(hydrated, true);
     assert.equal(state.name, "Speed");
     assert.equal(state.bestMetric, 100);
     assert.equal(state.results.length, 2);
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("research lifecycle reads the latest Run Result from journal", () => {
+  const projectDir = tempProject("pi-goal-lifecycle");
+  try {
+    selectActiveResearch(projectDir, "default");
+    appendConfigEntry(projectDir);
+    appendRunEntry(projectDir, { run: 1, description: "baseline", timestamp: 1 });
+    appendRunEntry(projectDir, { run: 2, description: "faster", timestamp: 2 });
+
     assert.equal(readLastRunResult(projectDir)?.description, "faster");
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("research lifecycle snapshot summarizes hydrated Research state", () => {
+  const projectDir = tempProject("pi-goal-lifecycle");
+  try {
+    selectActiveResearch(projectDir, "default");
+    appendConfigEntry(projectDir);
+    appendRunEntry(projectDir, { run: 1, metric: 100, timestamp: 1, metrics: { compile_ms: 50 } });
+    appendRunEntry(projectDir, { run: 2, metric: 90, timestamp: 2, metrics: { compile_ms: 45 } });
+    const state = createResearchState();
+    hydrateResearchStateFromJournal(state, fs.readFileSync(journalPath(projectDir), "utf-8"));
 
     assert.deepEqual(buildResearchSnapshot(state), {
       metric_name: "total_ms",
@@ -61,7 +103,7 @@ test("research lifecycle hydrates state and reads the latest Run Result", () => 
 });
 
 test("research runtime restore prefers Research Journal over session history and syncs phase", () => {
-  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-lifecycle-"));
+  const projectDir = tempProject("pi-goal-lifecycle");
   try {
     selectActiveResearch(projectDir, "default");
     fs.writeFileSync(journalPath(projectDir), [
