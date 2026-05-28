@@ -4,7 +4,7 @@ import {
   EXPERIMENT_MAX_BYTES,
   type RunDetails,
 } from "../execution/experiment-runner.ts";
-import { inferMetricUnit } from "../domain/research-state.ts";
+import { inferMetricUnit } from "../domain/metric-definition.ts";
 import { formatMetricValue } from "./metric-format.ts";
 
 const PREVIEW_LINES = 5;

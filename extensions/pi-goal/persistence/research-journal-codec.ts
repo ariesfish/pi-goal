@@ -1,3 +1,5 @@
+import { inferMetricUnit } from "../domain/metric-definition.ts";
+
 export type JournalEntry = Record<string, unknown>;
 
 export interface ResearchConfigEntry extends JournalEntry {
@@ -50,15 +52,6 @@ function isObjectRecord(value: unknown): value is JournalEntry {
 
 function nonEmptyLines(text: string): string[] {
   return text.split("\n").filter(Boolean);
-}
-
-function inferMetricUnit(name: string): string {
-  if (name.endsWith("µs")) return "µs";
-  if (name.endsWith("_ms")) return "ms";
-  if (name.endsWith("_s") || name.endsWith("_sec")) return "s";
-  if (name.endsWith("_kb")) return "kb";
-  if (name.endsWith("_mb")) return "mb";
-  return "";
 }
 
 function metricMapFrom(value: unknown): Record<string, number> {

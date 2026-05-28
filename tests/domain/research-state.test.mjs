@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { inferMetricUnit } from "../../extensions/pi-goal/domain/metric-definition.ts";
 import {
   cloneResearchState,
   computeConfidence,
@@ -41,6 +42,16 @@ test("research state queries stay scoped to the current experiment", () => {
   assert.equal(findBaselineRunNumber(results, 1), 3);
   assert.equal(findBestMetric(results, 1, "lower"), 90);
   assert.equal(findBestMetric(results, 1, "higher"), 100);
+});
+
+test("metric unit inference recognizes known suffixes", () => {
+  assert.equal(inferMetricUnit("compile_µs"), "µs");
+  assert.equal(inferMetricUnit("compile_ms"), "ms");
+  assert.equal(inferMetricUnit("duration_s"), "s");
+  assert.equal(inferMetricUnit("duration_sec"), "s");
+  assert.equal(inferMetricUnit("bundle_kb"), "kb");
+  assert.equal(inferMetricUnit("bundle_mb"), "mb");
+  assert.equal(inferMetricUnit("tokens"), "");
 });
 
 test("secondary metric registration infers units and avoids duplicates", () => {
