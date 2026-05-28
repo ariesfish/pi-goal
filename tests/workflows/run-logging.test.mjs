@@ -166,6 +166,33 @@ test("run logging rejects missing known secondary metrics before side effects", 
   }
 });
 
+test("run logging blocks state mutation when journal append fails", async () => {
+  const projectDir = tempProject("pi-goal-log");
+  try {
+    selectActiveResearch(projectDir, "default");
+    fs.mkdirSync(journalPath(projectDir), { recursive: true });
+    const state = createResearchState();
+    state.name = "Speed";
+    state.metricName = "total_ms";
+    state.metricUnit = "ms";
+
+    const result = await recordRunResult({
+      commit: "pending",
+      metric: 100,
+      status: "discard",
+      description: "journal fails",
+      asi: { hypothesis: "journal failure path" },
+    }, fakeDeps(projectDir, state));
+
+    assert.equal(result.ok, false);
+    assert.match(result.text, /Failed to write goal\.jsonl/);
+    assert.equal(state.results.length, 0);
+    assert.equal(state.bestMetric, null);
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
 test("run logging preserves a kept Run Result when git commit fails", async () => {
   const projectDir = tempProject("pi-goal-log");
   try {
