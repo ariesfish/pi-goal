@@ -3,9 +3,9 @@ import { Text } from "@earendil-works/pi-tui";
 
 import {
   firstTextContent,
+  resolveResearchWorkDir,
   textToolResult,
 } from "./tool-adapter.ts";
-import { validateWorkDir, resolveWorkDir } from "../persistence/goal-config.ts";
 import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/research-workspace.ts";
 import { ValidateResearchParams } from "../support/schema.ts";
 import {
@@ -28,9 +28,9 @@ export function registerValidateResearchTool(pi: ExtensionAPI): void {
     parameters: ValidateResearchParams,
 
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const workDirError = validateWorkDir(ctx.cwd);
-      if (workDirError) return textToolResult(`❌ ${workDirError}`);
-      const workDir = resolveWorkDir(ctx.cwd);
+      const workDirResult = resolveResearchWorkDir(ctx);
+      if (!workDirResult.ok) return textToolResult(workDirResult.text);
+      const workDir = workDirResult.workDir;
       const dirtyCheck = await checkResearchWorkspace(pi, workDir);
       const dirtyBlock = formatWorkspaceSafetyError(dirtyCheck);
       const result = await validateResearch({

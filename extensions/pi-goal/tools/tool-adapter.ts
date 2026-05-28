@@ -9,23 +9,33 @@ export interface ResearchToolContext {
   ctxCwd: string;
 }
 
+export type ResearchWorkDirResult =
+  | { ok: true; workDir: string; ctxCwd: string }
+  | { ok: false; text: string };
+
 export type ResearchToolContextResult =
   | { ok: true; context: ResearchToolContext }
   | { ok: false; text: string };
+
+export function resolveResearchWorkDir(ctx: ExtensionContext): ResearchWorkDirResult {
+  const workDirError = validateWorkDir(ctx.cwd);
+  if (workDirError) return { ok: false, text: `❌ ${workDirError}` };
+  return { ok: true, workDir: resolveWorkDir(ctx.cwd), ctxCwd: ctx.cwd };
+}
 
 export function resolveResearchToolContext(
   ctx: ExtensionContext,
   getRuntime: (ctx: ExtensionContext) => SessionRuntime,
 ): ResearchToolContextResult {
-  const workDirError = validateWorkDir(ctx.cwd);
-  if (workDirError) return { ok: false, text: `❌ ${workDirError}` };
+  const workDirResult = resolveResearchWorkDir(ctx);
+  if (!workDirResult.ok) return workDirResult;
 
   return {
     ok: true,
     context: {
       runtime: getRuntime(ctx),
-      workDir: resolveWorkDir(ctx.cwd),
-      ctxCwd: ctx.cwd,
+      workDir: workDirResult.workDir,
+      ctxCwd: workDirResult.ctxCwd,
     },
   };
 }
