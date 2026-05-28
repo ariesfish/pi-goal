@@ -1,6 +1,10 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 
+import {
+  firstTextContent,
+  textToolResult,
+} from "./tool-adapter.ts";
 import { validateWorkDir, resolveWorkDir } from "../persistence/goal-config.ts";
 import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/research-workspace.ts";
 import { ValidateResearchParams } from "../support/schema.ts";
@@ -25,9 +29,7 @@ export function registerValidateResearchTool(pi: ExtensionAPI): void {
 
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const workDirError = validateWorkDir(ctx.cwd);
-      if (workDirError) {
-        return { content: [{ type: "text", text: `❌ ${workDirError}` }], details: {} };
-      }
+      if (workDirError) return textToolResult(`❌ ${workDirError}`);
       const workDir = resolveWorkDir(ctx.cwd);
       const dirtyCheck = await checkResearchWorkspace(pi, workDir);
       const dirtyBlock = formatWorkspaceSafetyError(dirtyCheck);
@@ -41,10 +43,7 @@ export function registerValidateResearchTool(pi: ExtensionAPI): void {
         result.issues.push({ code: "dirty_tree", severity: "error", message: dirtyBlock });
         result.ok = false;
       }
-      return {
-        content: [{ type: "text", text: formatResearchValidationResult(result) }],
-        details: result,
-      };
+      return textToolResult(formatResearchValidationResult(result), result);
     },
 
     renderCall(_args, theme) {
@@ -52,8 +51,7 @@ export function registerValidateResearchTool(pi: ExtensionAPI): void {
     },
 
     renderResult(result, _options, _theme) {
-      const t = result.content[0];
-      return new Text(t?.type === "text" ? t.text : "", 0, 0);
+      return new Text(firstTextContent(result), 0, 0);
     },
   });
 }

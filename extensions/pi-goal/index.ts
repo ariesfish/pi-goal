@@ -44,7 +44,7 @@ import { registerValidateResearchTool } from "./tools/validate.ts";
 import { registerInitExperimentTool, registerStartExperimentTool } from "./tools/init.ts";
 import { registerRunExperimentTool } from "./tools/run.ts";
 import { registerLogExperimentTool } from "./tools/log.ts";
-import { readLastRunResult } from "./persistence/research-journal-reader.ts";
+import { readLastRunResult } from "./persistence/research-journal.ts";
 import { buildResearchSnapshot } from "./domain/research-snapshot.ts";
 import { readResearchFileContract } from "./persistence/research-files.ts";
 import {

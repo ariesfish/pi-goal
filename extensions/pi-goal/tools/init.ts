@@ -1,7 +1,11 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 
-import { resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
+import {
+  firstTextContent,
+  resolveResearchToolContext,
+  textToolResult,
+} from "./tool-adapter.ts";
 import type { HookPayload } from "../execution/hooks.ts";
 import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
@@ -75,22 +79,15 @@ function registerExperimentConfigTool(
     parameters: InitParams,
 
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const runtime = deps.getRuntime(ctx);
+      const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
+      if (!contextResult.ok) return textToolResult(contextResult.text);
 
-      const workDirError = validateWorkDir(ctx.cwd);
-      if (workDirError) {
-        return {
-          content: [{ type: "text", text: `❌ ${workDirError}` }],
-          details: {},
-        };
-      }
-
-      const workDir = resolveWorkDir(ctx.cwd);
+      const { runtime, workDir, ctxCwd } = contextResult.context;
       const result = await executeExperimentConfigWorkflow(params, {
         pi,
         runtime,
         workDir,
-        ctxCwd: ctx.cwd,
+        ctxCwd,
         kind: copy.name,
         title: copy.title,
         fireHook: deps.fireHook,
@@ -102,10 +99,7 @@ function registerExperimentConfigTool(
       deps.updateWidget(ctx);
       if (result.ok && result.steer) pi.sendUserMessage(result.steer, { deliverAs: "steer" });
 
-      return {
-        content: [{ type: "text", text: result.text }],
-        details: result.ok ? { state: result.state } : {},
-      };
+      return textToolResult(result.text, result.ok ? { state: result.state } : {});
     },
 
     renderCall(args, theme) {
@@ -115,8 +109,7 @@ function registerExperimentConfigTool(
     },
 
     renderResult(result, _options, _theme) {
-      const t = result.content[0];
-      return new Text(t?.type === "text" ? t.text : "", 0, 0);
+      return new Text(firstTextContent(result), 0, 0);
     },
   });
 }

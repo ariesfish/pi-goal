@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import test from "node:test";
 
-import { readLastRunResult } from "../../extensions/pi-goal/persistence/research-journal-reader.ts";
+import { readLastRunResult } from "../../extensions/pi-goal/persistence/research-journal.ts";
 import { hydrateResearchStateFromJournal } from "../../extensions/pi-goal/persistence/research-state-hydration.ts";
 import { restoreActiveResearchRuntime } from "../../extensions/pi-goal/support/research-runtime-restore.ts";
 import { selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";

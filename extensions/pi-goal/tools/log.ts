@@ -1,10 +1,14 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
+import {
+  firstTextContent,
+  resolveResearchToolContext,
+  textToolResult,
+} from "./tool-adapter.ts";
 import { formatMetricValue } from "../ui/metric-format.ts";
 import type { HookPayload } from "../execution/hooks.ts";
 import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
-import { onResearchRunLogged } from "../protocol/research-phase.ts";
+
 import type { SessionRuntime, LogDetails } from "../support/runtime.ts";
 import { LogParams } from "../support/schema.ts";
 import {
@@ -12,7 +16,10 @@ import {
   isBetter,
   type ResearchState,
 } from "../domain/research-state.ts";
-import { recordRunResult } from "../workflows/research-workflow.ts";
+import {
+  finishRecordedRunResult,
+  recordRunResult,
+} from "../workflows/run-result-recording.ts";
 
 export interface LogExperimentToolDeps {
   getRuntime(ctx: ExtensionContext): SessionRuntime;
@@ -46,18 +53,11 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
   parameters: LogParams,
 
   async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-    const runtime = deps.getRuntime(ctx);
-    const state = runtime.state;
+    const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
+    if (!contextResult.ok) return textToolResult(contextResult.text);
 
-    // Validate working directory exists
-    const workDirError = validateWorkDir(ctx.cwd);
-    if (workDirError) {
-      return {
-        content: [{ type: "text", text: `❌ ${workDirError}` }],
-        details: {},
-      };
-    }
-    const workDir = resolveWorkDir(ctx.cwd);
+    const { runtime, workDir } = contextResult.context;
+    const state = runtime.state;
     const result = await recordRunResult(params, {
       pi,
       workDir,
@@ -69,21 +69,12 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
       broadcastDashboardUpdate: deps.broadcastDashboardUpdate,
     });
 
-    if (!result.ok) {
-      return {
-        content: [{ type: "text", text: result.text }],
-        details: {},
-      };
-    }
+    if (!result.ok) return textToolResult(result.text);
 
     let text = result.text;
     if (result.afterSteer) pi.sendUserMessage(result.afterSteer, { deliverAs: "steer" });
 
-    runtime.activeRun = null;
-    runtime.lastRunChecks = null;
-    runtime.lastRunDuration = null;
-
-    onResearchRunLogged(runtime.loop, result.limitReached);
+    finishRecordedRunResult(runtime, result.limitReached);
     if (result.limitReached) {
       text += `\n\n🛑 Maximum runs reached (${state.runLimit}) for the current experiment. STOP the research loop now.`;
       ctx.abort();
@@ -96,14 +87,11 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
     // Refresh fullscreen overlay if open
     deps.requestOverlayRender();
 
-    return {
-      content: [{ type: "text", text }],
-      details: {
-        runResult: { ...result.runResult, metrics: { ...result.runResult.metrics } },
-        state: cloneResearchState(state),
-        wallClockSeconds: result.wallClockSeconds,
-      } as LogDetails,
-    };
+    return textToolResult(text, {
+      runResult: { ...result.runResult, metrics: { ...result.runResult.metrics } },
+      state: cloneResearchState(state),
+      wallClockSeconds: result.wallClockSeconds,
+    } as LogDetails);
   },
 
   renderCall(args, theme) {
@@ -122,8 +110,7 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
   renderResult(result, _options, theme) {
     const d = result.details as LogDetails | undefined;
     if (!d) {
-      const t = result.content[0];
-      return new Text(t?.type === "text" ? t.text : "", 0, 0);
+      return new Text(firstTextContent(result), 0, 0);
     }
 
     const { runResult: exp, state: s } = d;

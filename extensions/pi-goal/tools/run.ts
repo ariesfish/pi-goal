@@ -1,6 +1,10 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
+import {
+  firstTextContent,
+  resolveResearchToolContext,
+  textToolResult,
+} from "./tool-adapter.ts";
 import {
   EXPERIMENT_MAX_BYTES,
   EXPERIMENT_MAX_LINES,
@@ -41,18 +45,10 @@ export function registerRunExperimentTool(pi: ExtensionAPI, deps: RunExperimentT
   parameters: RunParams,
 
   async execute(_toolCallId, params, signal, onUpdate, ctx) {
-    const runtime = deps.getRuntime(ctx);
-    const state = runtime.state;
+    const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
+    if (!contextResult.ok) return textToolResult(contextResult.text);
 
-    // Validate working directory exists
-    const workDirError = validateWorkDir(ctx.cwd);
-    if (workDirError) {
-      return {
-        content: [{ type: "text", text: `❌ ${workDirError}` }],
-        details: {},
-      };
-    }
-    const workDir = resolveWorkDir(ctx.cwd);
+    const { runtime, workDir } = contextResult.context;
     const result = await executeRunExperimentWorkflow(params, {
       pi,
       workDir,
@@ -65,10 +61,7 @@ export function registerRunExperimentTool(pi: ExtensionAPI, deps: RunExperimentT
       },
     });
 
-    return {
-      content: [{ type: "text", text: result.text }],
-      details: result.ok ? result.details : result.details ?? {},
-    };
+    return textToolResult(result.text, result.ok ? result.details : result.details ?? {});
   },
 
   renderCall(args, theme) {
@@ -92,8 +85,7 @@ export function registerRunExperimentTool(pi: ExtensionAPI, deps: RunExperimentT
 
     const d = result.details as (RunDetails & { truncation?: any; fullOutputPath?: string }) | undefined;
     if (!d) {
-      const t = result.content[0];
-      return new Text(t?.type === "text" ? t.text : "", 0, 0);
+      return new Text(firstTextContent(result), 0, 0);
     }
 
     return new Text(renderRunExperimentResultText({ details: d, expanded, theme }), 0, 0);

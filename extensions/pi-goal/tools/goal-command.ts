@@ -5,9 +5,9 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { createResearchState, type ResearchState } from "../domain/research-state.ts";
 import type { HookPayload } from "../execution/hooks.ts";
 import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
-import { resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
+import { resolveResearchToolContext } from "./tool-adapter.ts";
 import { readResearchFileContract } from "../persistence/research-files.ts";
-import { readLastRunResult } from "../persistence/research-journal-reader.ts";
+import { readLastRunResult } from "../persistence/research-journal.ts";
 import { activeResearch, selectActiveResearch } from "../persistence/research-directory.ts";
 import { clearResearchPhase, deactivateResearch, type ResearchProtocolOptions } from "../protocol/research-phase.ts";
 import { startResearchActivation } from "../protocol/research-protocol.ts";
@@ -57,7 +57,12 @@ async function handleGoalCommand(
   }
 
   if (command === "export") {
-    await deps.exportDashboard(ctx, resolveWorkDir(ctx.cwd));
+    const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
+    if (!contextResult.ok) {
+      ctx.ui.notify(contextResult.text.replace(/^❌\s*/, ""), "error");
+      return;
+    }
+    await deps.exportDashboard(ctx, contextResult.context.workDir);
     return;
   }
 
@@ -123,9 +128,9 @@ function turnResearchOff(ctx: ExtensionContext, deps: GoalCommandDeps, runtime: 
 }
 
 function selectResearch(ctx: ExtensionContext, deps: GoalCommandDeps, trimmedArgs: string): void {
-  const workDirError = validateWorkDir(ctx.cwd);
-  if (workDirError) {
-    ctx.ui.notify(workDirError, "error");
+  const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
+  if (!contextResult.ok) {
+    ctx.ui.notify(contextResult.text.replace(/^❌\s*/, ""), "error");
     return;
   }
   const researchId = trimmedArgs.slice("select".length).trim();
@@ -133,8 +138,7 @@ function selectResearch(ctx: ExtensionContext, deps: GoalCommandDeps, trimmedArg
     ctx.ui.notify("Usage: /goal select <research-id>", "info");
     return;
   }
-  const workDir = resolveWorkDir(ctx.cwd);
-  const selectedResearch = selectActiveResearch(workDir, researchId);
+  const selectedResearch = selectActiveResearch(contextResult.context.workDir, researchId);
   deps.reconstructState(ctx);
   ctx.ui.notify(`Active research selected: ${selectedResearch.id}`, "info");
 }
@@ -152,7 +156,12 @@ function requestExperimentStart(ctx: ExtensionContext, deps: GoalCommandDeps, ru
 }
 
 function clearActiveResearchJournal(ctx: ExtensionContext, deps: GoalCommandDeps, runtime: SessionRuntime): void {
-  const jsonlPath = activeResearch(resolveWorkDir(ctx.cwd)).paths.journal;
+  const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
+  if (!contextResult.ok) {
+    ctx.ui.notify(contextResult.text.replace(/^❌\s*/, ""), "error");
+    return;
+  }
+  const jsonlPath = activeResearch(contextResult.context.workDir).paths.journal;
   clearResearchPhase(runtime.loop);
   runtime.dashboardExpanded = false;
   runtime.lastRunChecks = null;
@@ -189,12 +198,12 @@ async function startOrResumeResearch(
     return;
   }
 
-  const workDirError = validateWorkDir(ctx.cwd);
-  if (workDirError) {
-    ctx.ui.notify(workDirError, "error");
+  const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
+  if (!contextResult.ok) {
+    ctx.ui.notify(contextResult.text.replace(/^❌\s*/, ""), "error");
     return;
   }
-  const workDir = resolveWorkDir(ctx.cwd);
+  const workDir = contextResult.context.workDir;
   const dirtyCheck = await deps.checkWorkspace(pi, workDir);
   const dirtyBlock = formatWorkspaceSafetyError(dirtyCheck);
   if (dirtyBlock) {
