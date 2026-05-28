@@ -5,6 +5,8 @@ import {
   composeResearchPhaseResumeMessage,
   deactivateResearch,
   detectPhaseFromFiles,
+  enterResearchLoopingFromFiles,
+  enterResearchNeedsInitFromFiles,
   hasPendingResearchPhaseResume,
   hasReachedResearchAutoResumeLimit,
   markResearchAutoResumeSent,
@@ -37,11 +39,7 @@ export function syncResearchPhaseFromResearchFiles(
   contract: ResearchFileContract,
 ): void {
   if (contract.hasConfigHeader) {
-    loop.mode = true;
-    loop.phase = "looping";
-    loop.activationPrompt = null;
-    loop.activationTurns = 0;
-    loop.lastRun = null;
+    enterResearchLoopingFromFiles(loop);
     return;
   }
 
@@ -51,8 +49,7 @@ export function syncResearchPhaseFromResearchFiles(
     hasBenchmarkScript: contract.hasBenchmarkScript,
   });
   if (phase === "needs_init") {
-    loop.mode = true;
-    loop.phase = "needs_init";
+    enterResearchNeedsInitFromFiles(loop);
   } else {
     deactivateResearch(loop);
   }
@@ -63,8 +60,7 @@ export function ensureNeedsInitFromResearchFiles(
   contract: ResearchFileContract,
 ): void {
   if (!loop.mode && contract.hasRules && contract.hasBenchmarkScript && !contract.hasConfigHeader) {
-    loop.mode = true;
-    loop.phase = "needs_init";
+    enterResearchNeedsInitFromFiles(loop);
   }
 }
 

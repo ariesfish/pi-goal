@@ -80,7 +80,27 @@ export function resetResearchPhaseForAgentStart(state: ResearchPhaseState): void
   state.runsSinceAgentStart = 0;
 }
 
+export function resetResearchResumeCounters(state: ResearchPhaseState): void {
+  state.autoResumeTurns = 0;
+  state.activationTurns = 0;
+}
+
 export function enterResearchLoopingFromPersistedLog(state: ResearchPhaseState): void {
+  enterResearchLooping(state);
+}
+
+export function enterResearchLoopingFromFiles(state: ResearchPhaseState): void {
+  enterResearchLooping(state);
+}
+
+export function enterResearchNeedsInitFromFiles(state: ResearchPhaseState): void {
+  state.mode = true;
+  state.phase = "needs_init";
+  state.activationPrompt = null;
+  state.lastRun = null;
+}
+
+function enterResearchLooping(state: ResearchPhaseState): void {
   state.mode = true;
   state.phase = "looping";
   state.activationPrompt = null;

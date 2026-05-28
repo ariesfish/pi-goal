@@ -1,5 +1,9 @@
 import { createResearchState, cloneResearchState, computeConfidence, type ResearchState } from "../domain/research-state.ts";
-import { resetResearchPhaseForAgentStart, type ResearchPhaseState } from "../protocol/research-phase.ts";
+import {
+  resetResearchPhaseForAgentStart,
+  resetResearchResumeCounters,
+  type ResearchPhaseState,
+} from "../protocol/research-phase.ts";
 import { syncResearchPhaseFromResearchFiles } from "../protocol/research-protocol.ts";
 import type { LogDetails, SessionRuntime } from "./runtime.ts";
 import { readRunLimit } from "../persistence/goal-config.ts";
@@ -26,8 +30,7 @@ export function resetRuntimeForActiveResearchRestore(runtime: SessionRuntime): v
   runtime.lastRunDuration = null;
   runtime.activeRun = null;
   resetResearchPhaseForAgentStart(runtime.loop);
-  runtime.loop.autoResumeTurns = 0;
-  runtime.loop.activationTurns = 0;
+  resetResearchResumeCounters(runtime.loop);
   runtime.state = createResearchState();
 }
 
