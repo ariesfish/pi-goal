@@ -86,6 +86,10 @@ export function readResearchFileContract(workDir: string): ResearchFileContract 
   };
 }
 
+export function shouldUseScriptCommandOnly(contract: ResearchFileContract): boolean {
+  return contract.hasBenchmarkScript && !contract.invalidBenchmarkScript;
+}
+
 export function validateResearchFiles(workDir: string): ResearchFileValidationResult {
   const contract = readResearchFileContract(workDir);
   const issues: ResearchValidationIssue[] = [];

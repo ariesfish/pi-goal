@@ -64,6 +64,31 @@ test("runExperiment returns structured details, parsed metrics, and checks resul
   }
 });
 
+test("runExperiment stores full output and streams truncated updates for large output", async () => {
+  const workDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-runner-"));
+  try {
+    const result = await runExperiment({
+      command: "python3 - <<'PY'\nfor i in range(700): print('line-' + str(i))\nprint('METRIC total_ms=12')\nPY",
+      workDir,
+      metricName: "total_ms",
+      metricUnit: "ms",
+      pi: {
+        async exec() {
+          return { code: 0, killed: false, stdout: "", stderr: "" };
+        },
+      },
+    });
+
+    assert.equal(result.details.passed, true);
+    assert.equal(result.details.parsedPrimary, 12);
+    assert.equal(typeof result.fullOutputPath, "string");
+    assert.match(fs.readFileSync(result.fullOutputPath, "utf-8"), /line-0/);
+    assert.match(result.llmOutput, /METRIC total_ms=12/);
+  } finally {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
 test("runExperiment records timed out checks as a failed Run", async () => {
   const workDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-runner-"));
   try {

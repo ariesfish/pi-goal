@@ -7,8 +7,10 @@ import {
   type ExperimentRunUpdate,
   type RunDetails,
 } from "../execution/experiment-runner.ts";
-import { shouldUseScriptCommandOnly } from "../execution/research-command-policy.ts";
-import { readResearchFileContract } from "../persistence/research-files.ts";
+import {
+  readResearchFileContract,
+  shouldUseScriptCommandOnly,
+} from "../persistence/research-files.ts";
 import {
   onResearchRunFinished,
   researchAwaitingLogBlockMessage,
