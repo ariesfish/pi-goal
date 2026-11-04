@@ -2,7 +2,7 @@
   "name": "@ariesfish/pi-goal",
   "version": "0.4.0",
   "type": "module",
-  "description": "Autonomous experiment loop for pi — run, measure, keep or discard. Inspired by karpathy/autoresearch.",
+  "description": "Autonomous experiment loop for pi \u2014 run, measure, keep or discard. Inspired by karpathy/autoresearch.",
   "keywords": [
     "pi-package",
     "pi",
@@ -50,15 +50,15 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
+    "@earendil-works/pi-ai": ">=1.5.0",
+    "@earendil-works/pi-coding-agent": ">=1.5.0",
+    "@earendil-works/pi-tui": ">=1.5.0",
     "typebox": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.75.0",
-    "@earendil-works/pi-coding-agent": "^0.75.0",
-    "@earendil-works/pi-tui": "^0.75.0",
+    "@earendil-works/pi-ai": "^1.5.0",
+    "@earendil-works/pi-coding-agent": "^1.5.0",
+    "@earendil-works/pi-tui": "^1.5.0",
     "@types/node": "^25.9.1",
     "typebox": "^1.1.38",
     "typescript": "^6.0.3"

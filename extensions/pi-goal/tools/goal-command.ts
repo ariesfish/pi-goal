@@ -10,8 +10,7 @@ import { readResearchFileContract } from "../persistence/research-files.ts";
 import { readLastRunResult } from "../persistence/research-journal.ts";
 import { activeResearch, selectActiveResearch } from "../persistence/research-directory.ts";
 import { clearResearchPhase, deactivateResearch, type ResearchProtocolOptions } from "../protocol/research-phase.ts";
-import { startResearchActivation } from "../protocol/research-protocol.ts";
-import type { ResumeAdapter } from "../protocol/resume-scheduler.ts";
+import { cancelResearchResume, startResearchActivation } from "../protocol/research-protocol.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/research-workspace.ts";
 
@@ -22,7 +21,6 @@ export interface GoalCommandDeps {
   reconstructState(ctx: ExtensionContext): void;
   stopDashboardServer(): void;
   exportDashboard(ctx: ExtensionContext, workDir: string): Promise<void>;
-  resume: Pick<ResumeAdapter, "cancel" | "sendWhenReady">;
   loopOptions: ResearchProtocolOptions;
   fireHook(payload: HookPayload): Promise<string | null>;
   buildResearchSnapshot(state: ResearchState): ResearchSnapshot;
@@ -77,7 +75,7 @@ async function handleGoalCommand(
   }
 
   if (command === "reinit") {
-    requestExperimentStart(ctx, deps, runtime);
+    requestExperimentStart(pi, ctx, deps, runtime);
     return;
   }
 
@@ -117,7 +115,7 @@ function turnResearchOff(ctx: ExtensionContext, deps: GoalCommandDeps, runtime: 
   runtime.lastRunChecks = null;
   runtime.lastRunDuration = null;
   runtime.activeRun = null;
-  deps.resume.cancel(runtime);
+  cancelResearchResume(runtime);
   deps.stopDashboardServer();
   deps.clearSessionUi(ctx);
   if (wasRunning) ctx.abort();
@@ -143,16 +141,29 @@ function selectResearch(ctx: ExtensionContext, deps: GoalCommandDeps, trimmedArg
   ctx.ui.notify(`Active research selected: ${selectedResearch.id}`, "info");
 }
 
-function requestExperimentStart(ctx: ExtensionContext, deps: GoalCommandDeps, runtime: SessionRuntime): void {
+function requestExperimentStart(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  deps: GoalCommandDeps,
+  runtime: SessionRuntime,
+): void {
   if (runtime.state.results.length === 0) {
     ctx.ui.notify("No runs yet — use init_goal to initialize the active research first", "info");
     return;
   }
-  deps.resume.sendWhenReady(ctx, [
+  sendWhenReady(pi, ctx, [
     "Start a new Experiment in the active Research now.",
     "Call start_goal with the updated metric, unit, and direction, then run the new baseline with run_goal and log_goal.",
     "Use this only if the Research target is unchanged but the primary metric, direction, workload, measurement method, or baseline comparability changed.",
   ].join("\n"));
+}
+
+function sendWhenReady(pi: ExtensionAPI, ctx: ExtensionContext, message: string): void {
+  if (ctx.isIdle()) {
+    pi.sendUserMessage(message);
+    return;
+  }
+  pi.sendUserMessage(message, { deliverAs: "followUp" });
 }
 
 function clearActiveResearchJournal(ctx: ExtensionContext, deps: GoalCommandDeps, runtime: SessionRuntime): void {
@@ -166,7 +177,7 @@ function clearActiveResearchJournal(ctx: ExtensionContext, deps: GoalCommandDeps
   runtime.dashboardExpanded = false;
   runtime.lastRunChecks = null;
   runtime.activeRun = null;
-  deps.resume.cancel(runtime);
+  cancelResearchResume(runtime);
   runtime.state = createResearchState();
   deps.stopDashboardServer();
   deps.updateWidget(ctx);
@@ -228,7 +239,8 @@ async function startOrResumeResearch(
     research: deps.buildResearchSnapshot(state),
   });
 
-  deps.resume.sendWhenReady(
+  sendWhenReady(
+    pi,
     ctx,
     activationSteer ? `${activationSteer}\n\n${activation.kickoff}` : activation.kickoff,
   );

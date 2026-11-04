@@ -39,7 +39,6 @@ import {
 import { createDashboardServer } from "./ui/browser-dashboard.ts";
 import { createDashboardOverlayController } from "./ui/dashboard-overlay.ts";
 import { createWidgetController } from "./ui/widget.ts";
-import { createResumeAdapter } from "./protocol/resume-scheduler.ts";
 import { registerValidateResearchTool } from "./tools/validate.ts";
 import { registerInitExperimentTool, registerStartExperimentTool } from "./tools/init.ts";
 import { registerRunExperimentTool } from "./tools/run.ts";
@@ -48,12 +47,12 @@ import { readLastRunResult } from "./persistence/research-journal.ts";
 import { buildResearchSnapshot } from "./domain/research-snapshot.ts";
 import { readResearchFileContract } from "./persistence/research-files.ts";
 import {
-  composeResearchCompactionResumeMessage,
+  cancelResearchResume,
   composeResearchResumeMessage,
   composeResearchSystemPrompt,
-  shouldResumeResearchAfterCompact,
-  shouldResumeResearchAfterTurn,
 } from "./protocol/research-protocol.ts";
+import { decideBoundaryContinuation } from "./protocol/boundary-resume.ts";
+import { markResearchAutoResumeSent } from "./protocol/research-phase.ts";
 import { restoreActiveResearchRuntime } from "./support/research-runtime-restore.ts";
 import { registerGoalCommand } from "./tools/goal-command.ts";
 import { registerGoalContractTools } from "./tools/contract.ts";
@@ -69,8 +68,8 @@ import { registerCheckGoalTool } from "./tools/check.ts";
 // ---------------------------------------------------------------------------
 
 export default function goalExtension(pi: ExtensionAPI) {
-  const MAX_AUTORESUME_TURNS = 20;
-  const MAX_ACTIVATION_TURNS = 3;
+  const MAX_AUTORESUME_TURNS = 200;
+  const MAX_ACTIVATION_TURNS = 50;
   const BENCHMARK_GUARDRAIL =
     "Be careful not to overfit to the benchmarks and do not cheat on the benchmarks.";
   const loopOptions: ResearchProtocolOptions = {
@@ -79,9 +78,6 @@ export default function goalExtension(pi: ExtensionAPI) {
     benchmarkGuardrail: BENCHMARK_GUARDRAIL,
   };
 
-  // Outlasts pi's internal retry (setTimeout 0) and compaction-continue
-  // (setTimeout 100); see badlogic/pi-mono#2023, #2110.
-  const SETTLED_WINDOW_MS = 800;
   const shortcuts = resolveGoalShortcuts();
 
   const dashboardHintVariants = (toggleAction: "expand" | "collapse"): string[] => {
@@ -108,33 +104,6 @@ export default function goalExtension(pi: ExtensionAPI) {
   const getRuntime = (ctx: ExtensionContext): SessionRuntime =>
     runtimeStore.ensure(getSessionKey(ctx));
 
-  const shouldResearchAutoResumeAfterTurn = (runtime: SessionRuntime): boolean =>
-    shouldResumeResearchAfterTurn(runtime, loopOptions);
-
-  const shouldResearchAutoResumeAfterCompact = (runtime: SessionRuntime): boolean =>
-    shouldResumeResearchAfterCompact(runtime);
-
-  const notifyAutoResumeLimitReached = (ctx: ExtensionContext): void => {
-    ctx.ui.notify(
-      `Research auto-resume limit reached (${MAX_AUTORESUME_TURNS} turns)`,
-      "info",
-    );
-  };
-
-  const composeResearchPhaseResumeMessage = (_ctx: ExtensionContext): string =>
-    composeResearchResumeMessage(getRuntime(_ctx), loopOptions);
-
-  const composeResearchPhaseCompactionResumeMessage = (_ctx: ExtensionContext): string =>
-    composeResearchCompactionResumeMessage(loopOptions);
-
-  const resume = createResumeAdapter({
-    pi,
-    loopOptions,
-    settledWindowMs: SETTLED_WINDOW_MS,
-    notifyAutoResumeLimitReached,
-    composeResearchPhaseResumeMessage,
-  });
-
   const readLastRun = readLastRunResult;
 
   const fireHook = async (payload: HookPayload): Promise<string | null> => {
@@ -160,7 +129,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 
   const reconstructState = (ctx: ExtensionContext) => {
     const runtime = getRuntime(ctx);
-    resume.cancel(runtime);
+    cancelResearchResume(runtime);
     restoreActiveResearchRuntime({
       runtime,
       workDir: resolveWorkDir(ctx.cwd),
@@ -179,7 +148,7 @@ export default function goalExtension(pi: ExtensionAPI) {
   });
   pi.on("session_shutdown", async (_e, ctx) => {
     clearSessionUi(ctx);
-    resume.cancel(getRuntime(ctx));
+    cancelResearchResume(getRuntime(ctx));
     runtimeStore.clear(getSessionKey(ctx));
     stopDashboardServer();
   });
@@ -187,23 +156,44 @@ export default function goalExtension(pi: ExtensionAPI) {
   pi.on("agent_start", async (_event, ctx) => {
     const runtime = getRuntime(ctx);
     resetResearchPhaseForAgentStart(runtime.loop);
-    resume.pause(runtime);
-  });
-
-
-  pi.on("session_before_compact", async (_event, ctx) => {
-    resume.pause(getRuntime(ctx));
-  });
-
-  pi.on("session_compact", async (_event, ctx) => {
-    resume.ensure(ctx, getRuntime(ctx), shouldResearchAutoResumeAfterCompact, composeResearchPhaseCompactionResumeMessage);
   });
 
   pi.on("agent_end", async (_event, ctx) => {
     const runtime = getRuntime(ctx);
     runtime.activeRun = null;
     dashboardOverlay.requestRender();
-    resume.ensure(ctx, runtime, shouldResearchAutoResumeAfterTurn);
+  });
+
+  // Final actionable boundary: request one continuation instead of racing a timer.
+  pi.on("agent_before_settle", async (event, ctx) => {
+    const runtime = getRuntime(ctx);
+    const decision = decideBoundaryContinuation({
+      runtime,
+      options: loopOptions,
+      canContinue: event.context.canContinue,
+      outcome: event.outcome,
+      composeMessage: () => composeResearchResumeMessage(runtime, loopOptions),
+    });
+
+    if (decision.action === "stop") {
+      ctx.ui.notify(decision.reason, "info");
+      return;
+    }
+    if (decision.action !== "continue") return;
+
+    markResearchAutoResumeSent(runtime.loop);
+    return {
+      entries: [
+        ...event.entries,
+        {
+          type: "custom_message" as const,
+          customType: "goal-next-action",
+          content: decision.message,
+          display: false,
+        },
+      ],
+      continue: true,
+    };
   });
 
   // When in goal mode, add phase-specific loop control to the system prompt.
@@ -341,7 +331,6 @@ export default function goalExtension(pi: ExtensionAPI) {
     reconstructState,
     stopDashboardServer,
     exportDashboard: (ctx, workDir) => dashboardServer.export(ctx, workDir),
-    resume,
     loopOptions,
     fireHook,
     buildResearchSnapshot,

@@ -14,8 +14,6 @@ export interface SessionRuntime {
   lastRunDuration: number | null;
   activeRun: { startedAt: number; command: string } | null;
   state: ResearchState;
-  /** Pending auto-resume timer; cancelled when the agent starts a new run or compacts. */
-  pendingResumeTimer: ReturnType<typeof setTimeout> | null;
 }
 
 export function createSessionRuntime(): SessionRuntime {
@@ -26,7 +24,6 @@ export function createSessionRuntime(): SessionRuntime {
     lastRunDuration: null,
     activeRun: null,
     state: createResearchState(),
-    pendingResumeTimer: null,
   };
 }
 
