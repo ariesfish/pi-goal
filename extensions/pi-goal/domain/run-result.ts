@@ -15,6 +15,7 @@ export interface LogRunParams {
   description: string;
   metrics?: Record<string, number>;
   force?: boolean;
+  force_keep?: boolean;
   asi?: Record<string, unknown>;
 }
 

@@ -34,6 +34,7 @@ export interface GoalContract {
   objective: string;
   criteria: Criterion[];
   testGlobs: string[];
+  scopeGlobs: string[];
   allowTestEdits: boolean;
   frozenAt: number;
   hash: string;
@@ -175,6 +176,7 @@ export function legacyMetricContract(input: {
       },
     ],
     testGlobs: [],
+    scopeGlobs: [],
     allowTestEdits: false,
     frozenAt: 0,
   };
@@ -288,4 +290,12 @@ export function contractReadyToSeal(contract: GoalContract | null): { ok: boolea
     return { ok: false, reason: "The contract needs at least one blocking criterion with an executable check." };
   }
   return { ok: true };
+}
+
+export function isLegacyMetricContract(contract: GoalContract): boolean {
+  return (
+    contract.criteria.length === 1 &&
+    contract.criteria[0].id === "M1" &&
+    contract.criteria[0].kind === "metric"
+  );
 }
