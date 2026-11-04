@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.5.1] - 2026-11-04
+
+### Added
+
+- Reviewer `kind: "pi"`: a separate pi subagent with its own `model`, read-only tools, and an isolated temp cwd containing only `payload.json`. External command reviewers remain available as `kind: "command"`.
+- The reviewer payload now includes untracked files.
+- `/goal allow-benchmark` and `/goal protect-benchmark`; sealed mode protects `goal.sh` and `goal.checks.sh`.
+
+### Changed
+
+- Checks and narrative files resolve from the research directory first, with a project-root fallback for the default research.
+- Compaction is phase-aware: it includes the phase, contract, directions, last gate, and reverted attempts, and is wired into `session_before_compact`.
+- The widget and dashboard are visible before the first run and show direction/probe progress; criteria progress counts only contract criteria.
+- `run_goal` reports the actual best kept metric instead of the baseline.
+- `reviewer` config is read from the session directory, matching the documented location.
+
+### Fixed
+
+- Guard metric criteria compare their own metric and baseline, not the primary.
+- Gate and review results update runtime state, so precision and the widget reflect the current session.
+- Dashboard escapes status classes and run labels; `run_goal` labels no longer expose raw values.
+- Reviewer command stdin EPIPE, browser-opener spawn errors, and hook stdin EPIPE no longer crash the extension.
+- `freeze_criteria` explains the headless case instead of failing inside the dialog.
+- `finalize.sh` excludes `.goal/` and no longer interpolates paths into `node -e`.
+
 ## [0.5.0] - 2026-11-04
 
 ### Added
