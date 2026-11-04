@@ -109,3 +109,60 @@ test("sealed mode blocks git mutations but not read-only git", () => {
     );
   }
 });
+
+test("bash writes to protected paths are blocked", () => {
+  const cases = [
+    ["echo x > tests/a.test.js", /protected/],
+    ["printf x >> tests/a.test.js", /protected/],
+    ["cat <<'EOF' > tests/a.test.js\nx\nEOF", /protected/],
+    ["echo x | tee goal.checks.sh", /protected in the sealed phase/],
+    ["sed -i 's/a/b/' goal.sh", /protected in the sealed phase/],
+    ["perl -pi -e 's/a/b/' goal.checks.sh", /protected in the sealed phase/],
+    ["cp src/app.ts tests/a.test.js", /protected/],
+    ["mv src/app.ts goal.sh", /protected in the sealed phase/],
+    ["dd if=/dev/zero of=goal.checks.sh", /protected in the sealed phase/],
+    ["truncate -s 0 .goal/researches/default/goal.jsonl", /extension-managed/],
+  ];
+
+  for (const [command, pattern] of cases) {
+    assert.match(
+      sealedToolCallBlock(state(), { toolName: "bash", input: { command } }),
+      pattern,
+      command,
+    );
+  }
+});
+
+test("bash writes to ordinary paths and dev sinks are allowed", () => {
+  for (const command of [
+    "echo x > src/app.ts",
+    "echo x > /dev/null",
+    "pnpm test > /tmp/out.log 2>&1",
+    "git diff > patch.diff",
+    "echo x > goal.md",
+    "cat README.md | tee /tmp/readme.log",
+  ]) {
+    assert.equal(
+      sealedToolCallBlock(state(), { toolName: "bash", input: { command } }),
+      null,
+      command,
+    );
+  }
+});
+
+test("bash write guards honor the allow-tests and allow-benchmark policies", () => {
+  assert.equal(
+    sealedToolCallBlock(state({ testEditsAllowed: true }), {
+      toolName: "bash",
+      input: { command: "echo x > tests/a.test.js" },
+    }),
+    null,
+  );
+  assert.equal(
+    sealedToolCallBlock(state({ benchmarkEditsAllowed: true }), {
+      toolName: "bash",
+      input: { command: "echo x > goal.sh" },
+    }),
+    null,
+  );
+});

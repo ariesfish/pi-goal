@@ -123,6 +123,7 @@ A legacy metric-only research hydrates a one-criterion contract and enters `need
 - **Noise gate** — an improvement below `1.0x` confidence needs `force_keep: true` plus a reason in `asi`.
 - **Test protection** — test files matching the contract's `test_globs` cannot change unless `allow_test_edits` is set or the human ran `/goal allow-tests`.
 - **Benchmark protection** — `goal.sh` and `goal.checks.sh` are read-only in sealed mode until the human runs `/goal allow-benchmark`.
+- **Shell write interception** — sealed mode blocks shell writes to protected paths: redirection (`>`, `>>`), `tee`, in-place `sed`/`perl`, `cp`/`mv`/`install`, `dd of=`, and `truncate`. Arbitrary interpreters (`python -c`, `node -e`) remain a residual bypass; the guard is a speed bump, not a sandbox.
 - **Scope** — with `scope_globs`, changed paths outside them fail the gate.
 - **Reviewer** — optional; a finding blocks only when its repro is executed and fails, and only with `reviewer.blocking: true`.
 
