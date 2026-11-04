@@ -51,7 +51,7 @@ export function restoreActiveResearchRuntime(options: {
 
   state.runLimit = readRunLimit(ctxCwd);
   const fileContract = readResearchFileContract(workDir);
-  syncResearchPhaseFromResearchFiles(runtime.loop, fileContract);
+  syncResearchPhaseFromResearchFiles(runtime.loop, fileContract, state);
 
   return { state, fileContract, loadedFromJournal };
 }

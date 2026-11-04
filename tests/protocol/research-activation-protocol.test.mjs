@@ -15,6 +15,7 @@ import {
 } from "../../extensions/pi-goal/protocol/research-protocol.ts";
 import { readResearchFileContract } from "../../extensions/pi-goal/persistence/research-files.ts";
 import { createResearchPhaseState, onResearchRunFinished } from "../../extensions/pi-goal/protocol/research-phase.ts";
+import { createResearchState } from "../../extensions/pi-goal/domain/research-state.ts";
 import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
 import { ensureActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 
@@ -33,11 +34,11 @@ test("activation protocol enters needs_init when rules and script exist without 
     const contract = readResearchFileContract(projectDir);
     const loop = createResearchPhaseState();
 
-    syncResearchPhaseFromResearchFiles(loop, contract);
+    syncResearchPhaseFromResearchFiles(loop, contract, createResearchState());
 
     assert.equal(loop.mode, true);
     assert.equal(loop.phase, "needs_init");
-    assert.match(composeResearchSystemPrompt(loop, contract, options), /Required action: goal files exist but no config header exists/);
+    assert.match(composeResearchSystemPrompt(loop, contract, options), /Required action: goal files exist but no contract exists/);
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
@@ -54,9 +55,9 @@ test("activation protocol composes kickoff and notification from file contract",
 
     const decision = startResearchActivation(loop, contract, "optimize tests", options);
 
-    assert.equal(loop.phase, "needs_init");
+    assert.equal(loop.phase, "framing");
     assert.equal(decision.notification, "Research mode ON — rules loaded from goal.md");
-    assert.match(decision.kickoff, /Read goal\.md, then call init_goal/);
+    assert.match(decision.kickoff, /frame_goal/);
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });
   }

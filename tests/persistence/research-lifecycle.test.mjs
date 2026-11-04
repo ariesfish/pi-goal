@@ -138,7 +138,7 @@ test("research runtime restore prefers Research Journal over session history and
     assert.equal(runtime.state.name, "Journal");
     assert.equal(runtime.state.results[0].description, "journal baseline");
     assert.equal(runtime.loop.mode, true);
-    assert.equal(runtime.loop.phase, "looping");
+    assert.equal(runtime.loop.phase, "sealed");
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });
   }

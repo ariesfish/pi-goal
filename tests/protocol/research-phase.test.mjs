@@ -6,6 +6,7 @@ import {
   composeResearchPhaseResumeMessage,
   createResearchPhaseState,
   detectPhaseFromFiles,
+  enterResearchNeedsInitFromFiles,
   researchAwaitingLogBlockMessage,
   onResearchInitialized,
   onResearchRunLogged,
@@ -26,7 +27,7 @@ function assertProtocol(text, { marker, tool }) {
   if (tool) assert.match(text, new RegExp(tool));
 }
 
-test("activation without config enters setup phase and emits mandatory protocol", () => {
+test("activation without a contract enters framing and emits mandatory protocol", () => {
   const state = createResearchPhaseState();
   const message = activateResearch(state, {
     userGoal: "optimize tests",
@@ -36,12 +37,12 @@ test("activation without config enters setup phase and emits mandatory protocol"
   }, options);
 
   assert.equal(state.mode, true);
-  assert.equal(state.phase, "activating");
-  assertProtocol(message, { marker: "RESEARCH_ACTIVATION_REQUIRED", tool: "init_goal" });
+  assert.equal(state.phase, "framing");
+  assertProtocol(message, { marker: "RESEARCH_FRAMING_REQUIRED", tool: "frame_goal" });
   assert.equal(shouldResearchAutoResumeAfterTurn(state, options), true);
 });
 
-test("existing goal files without config enter needs_init", () => {
+test("existing goal files without a contract start framing, while file sync detects needs_init", () => {
   const state = createResearchPhaseState();
   const message = activateResearch(state, {
     userGoal: "resume",
@@ -50,10 +51,13 @@ test("existing goal files without config enter needs_init", () => {
     hasBenchmarkScript: true,
   }, options);
 
-  assert.equal(state.phase, "needs_init");
-  assertProtocol(message, { marker: "RESEARCH_ACTIVATION_REQUIRED", tool: "init_goal" });
+  assert.equal(state.phase, "framing");
+  assertProtocol(message, { marker: "RESEARCH_FRAMING_REQUIRED", tool: "frame_goal" });
   assert.equal(detectPhaseFromFiles({ hasRules: true, hasConfig: false, hasBenchmarkScript: true }), "needs_init");
-  assertProtocol(composeResearchPhaseResumeMessage(state, options), { marker: "RESEARCH_INIT_REQUIRED", tool: "init_goal" });
+
+  const setup = createResearchPhaseState();
+  enterResearchNeedsInitFromFiles(setup);
+  assertProtocol(composeResearchPhaseResumeMessage(setup, options), { marker: "RESEARCH_INIT_REQUIRED", tool: "init_goal" });
 });
 
 test("init_goal transitions to mandatory baseline phase", () => {
@@ -107,7 +111,7 @@ test("log_goal transitions from awaiting_log to looping or limit reached", () =>
   });
 
   onResearchRunLogged(state, false);
-  assert.equal(state.phase, "looping");
+  assert.equal(state.phase, "sealed");
   assert.equal(state.mode, true);
   assert.equal(state.lastRun, null);
   assert.equal(shouldResearchAutoResumeAfterTurn(state, options), true);

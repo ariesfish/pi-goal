@@ -5,7 +5,7 @@ import {
   composeResearchPhaseResumeMessage,
   deactivateResearch,
   detectPhaseFromFiles,
-  enterResearchLoopingFromFiles,
+  enterResearchSealedFromFiles,
   enterResearchNeedsInitFromFiles,
   hasPendingResearchPhaseResume,
   hasReachedResearchAutoResumeLimit,
@@ -22,6 +22,8 @@ import {
   promptSnapshotFor,
 } from "./research-file-snapshots.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
+import type { ResearchState } from "../domain/research-state.ts";
+import { legacyMetricContract } from "../domain/goal-contract.ts";
 
 export type PendingResearchResumeDecision =
   | { action: "deliver"; message: string }
@@ -37,9 +39,16 @@ export interface ActivationStartDecision {
 export function syncResearchPhaseFromResearchFiles(
   loop: ResearchPhaseState,
   contract: ResearchFileContract,
+  state: ResearchState,
 ): void {
-  if (contract.hasConfigHeader) {
-    enterResearchLoopingFromFiles(loop);
+  if (contract.hasContract || contract.hasConfigHeader) {
+    if (state.contract === null && contract.hasConfigHeader) {
+      state.contract = legacyMetricContract({
+        metricName: state.metricName || contract.metricName || "metric",
+        direction: state.bestDirection,
+      });
+    }
+    enterResearchSealedFromFiles(loop, { hasBaseline: contract.hasRuns });
     return;
   }
 
@@ -47,6 +56,7 @@ export function syncResearchPhaseFromResearchFiles(
     hasRules: contract.hasRules,
     hasConfig: contract.hasConfigHeader,
     hasBenchmarkScript: contract.hasBenchmarkScript,
+    hasContract: contract.hasContract,
   });
   if (phase === "needs_init") {
     enterResearchNeedsInitFromFiles(loop);

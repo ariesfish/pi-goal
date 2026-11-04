@@ -162,10 +162,11 @@ test("replays contract, directions, probes, gates, reviews, and attempts", () =>
   assert.equal(state.results[0].metric, 12_000);
 });
 
-test("legacy journals replay with empty protocol state", () => {
+test("legacy journals replay with a metric contract and empty protocol state", () => {
   const state = researchStateFromJournal(journal([LEGACY_CONFIG, LEGACY_RUN]));
 
-  assert.equal(state.contract, null);
+  assert.equal(state.contract?.criteria.length, 1);
+  assert.equal(state.contract?.criteria[0].metric?.name, "total_ms");
   assert.deepEqual(state.directions, []);
   assert.deepEqual(state.probes, []);
   assert.deepEqual(state.gates, []);
@@ -187,7 +188,7 @@ test("malformed protocol entries are skipped without losing run data", () => {
     LEGACY_RUN,
   ]));
 
-  assert.equal(state.contract, null);
+  assert.equal(state.contract?.criteria.length, 1);
   assert.equal(state.directions.length, 0);
   assert.equal(state.probes.length, 0);
   assert.equal(state.gates.length, 0);

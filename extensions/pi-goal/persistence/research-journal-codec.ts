@@ -53,6 +53,7 @@ export interface ResearchJournalRun {
 }
 
 export interface ResearchJournalModel extends GoalProtocolState {
+  hasConfig: boolean;
   name: string | null;
   metricName: string;
   metricUnit: string;
@@ -102,6 +103,7 @@ function asiFrom(value: unknown): Record<string, unknown> | undefined {
 function reconstructedState(): ResearchJournalModel {
   return {
     ...emptyGoalProtocolState(),
+    hasConfig: false,
     name: null,
     metricName: DEFAULT_METRIC_NAME,
     metricUnit: DEFAULT_METRIC_UNIT,
@@ -113,6 +115,7 @@ function reconstructedState(): ResearchJournalModel {
 }
 
 function updateConfig(state: ResearchJournalModel, entry: ResearchConfigEntry): void {
+  state.hasConfig = true;
   if (typeof entry.name === "string") state.name = entry.name;
   if (typeof entry.metricName === "string") state.metricName = entry.metricName;
   if (typeof entry.metricUnit === "string") state.metricUnit = entry.metricUnit;

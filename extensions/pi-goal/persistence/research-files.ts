@@ -23,6 +23,8 @@ export interface ResearchFileContract {
   hasIdeas: boolean;
   hasJournal: boolean;
   hasConfigHeader: boolean;
+  hasContract: boolean;
+  hasRuns: boolean;
   metricName: string | null;
   invalidRules: string | null;
   invalidBenchmarkScript: string | null;
@@ -50,6 +52,8 @@ export function readResearchFileContract(workDir: string): ResearchFileContract 
   const hasJournal = fs.existsSync(journalPath);
 
   let hasConfigHeader = false;
+  let hasContract = false;
+  let hasRuns = false;
   let metricName: string | null = null;
   let journalReadError: string | null = null;
 
@@ -58,7 +62,10 @@ export function readResearchFileContract(workDir: string): ResearchFileContract 
       const content = fs.readFileSync(journalPath, "utf-8");
       hasConfigHeader = hasResearchConfigHeader(content);
       if (hasConfigHeader) {
-        metricName = parseResearchJournalModel(content).metricName;
+        const model = parseResearchJournalModel(content);
+        metricName = model.metricName;
+        hasContract = model.contract !== null;
+        hasRuns = model.results.length > 0;
       }
     } catch (error) {
       journalReadError = error instanceof Error ? error.message : String(error);
@@ -78,6 +85,8 @@ export function readResearchFileContract(workDir: string): ResearchFileContract 
     hasIdeas,
     hasJournal,
     hasConfigHeader,
+    hasContract,
+    hasRuns,
     metricName,
     invalidRules: hasRules && !isFile(rulesPath) ? `${rulesPath} exists but is not a file.` : null,
     invalidBenchmarkScript: hasBenchmarkScript && !isFile(scriptPath) ? `${scriptPath} exists but is not a file.` : null,

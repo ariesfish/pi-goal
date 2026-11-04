@@ -7,6 +7,7 @@ export function activationSnapshotFor(contract: ResearchFileContract, userGoal: 
     hasRules: contract.hasRules,
     hasConfig: contract.hasConfigHeader,
     hasBenchmarkScript: contract.hasBenchmarkScript,
+    hasContract: contract.hasContract,
   };
 }
 

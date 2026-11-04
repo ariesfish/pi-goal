@@ -32,6 +32,8 @@ test("research file contract summarizes active research files and config header"
     assert.equal(contract.hasIdeas, true);
     assert.equal(contract.hasJournal, true);
     assert.equal(contract.hasConfigHeader, true);
+    assert.equal(contract.hasContract, false);
+    assert.equal(contract.hasRuns, false);
     assert.equal(contract.metricName, "total_ms");
     assert.equal(shouldUseScriptCommandOnly(contract), true);
     assert.deepEqual(activationSnapshotFor(contract, "optimize"), {
@@ -39,6 +41,7 @@ test("research file contract summarizes active research files and config header"
       hasRules: true,
       hasConfig: true,
       hasBenchmarkScript: true,
+      hasContract: false,
     });
     assert.equal(promptSnapshotFor(contract).mdPath.endsWith("goal.md"), true);
   } finally {

@@ -4,6 +4,7 @@ import {
   findBaselineMetric,
   type ResearchState,
 } from "../domain/research-state.ts";
+import { legacyMetricContract } from "../domain/goal-contract.ts";
 import {
   parseResearchJournalModel,
   type ResearchJournalModel,
@@ -51,7 +52,12 @@ export function hydrateResearchStateFromJournalModel(state: ResearchState, model
         })),
         testGlobs: [...model.contract.testGlobs],
       }
-    : null;
+    : model.hasConfig
+      ? legacyMetricContract({
+          metricName: model.metricName,
+          direction: model.bestDirection,
+        })
+      : null;
   state.directions = model.directions.map((direction) => ({
     ...direction,
     evidence: direction.evidence ? { ...direction.evidence } : undefined,

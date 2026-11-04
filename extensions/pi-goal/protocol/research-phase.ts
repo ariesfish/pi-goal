@@ -1,4 +1,11 @@
 import {
+  allDirectionsClosed,
+  contractReadyToSeal,
+  directionsReadyForProbing,
+  type Direction,
+  type GoalContract,
+} from "../domain/goal-contract.ts";
+import {
   activationMessage,
   composeResearchPhaseCompactionResumeMessage,
   composeResearchPhaseResumeMessage,
@@ -8,11 +15,13 @@ import {
 
 export type ResearchPhase =
   | "inactive"
-  | "activating"
+  | "framing"
+  | "probing"
+  | "converging"
+  | "sealed"
   | "needs_init"
   | "needs_baseline"
   | "awaiting_log"
-  | "looping"
   | "limit_reached";
 
 export interface LastRunSummary {
@@ -50,6 +59,7 @@ export interface ActivationSnapshot {
   hasRules: boolean;
   hasConfig: boolean;
   hasBenchmarkScript: boolean;
+  hasContract?: boolean;
 }
 
 export interface PromptSnapshot {
@@ -62,6 +72,20 @@ export interface PromptSnapshot {
   ideasPath: string;
   checksPath: string;
 }
+
+export interface PhaseTransition {
+  ok: boolean;
+  phase: ResearchPhase;
+  reason?: string;
+}
+
+const SETUP_PHASES: readonly ResearchPhase[] = [
+  "framing",
+  "probing",
+  "converging",
+  "needs_init",
+  "needs_baseline",
+];
 
 export function createResearchPhaseState(): ResearchPhaseState {
   return {
@@ -85,12 +109,15 @@ export function resetResearchResumeCounters(state: ResearchPhaseState): void {
   state.activationTurns = 0;
 }
 
-export function enterResearchLoopingFromPersistedLog(state: ResearchPhaseState): void {
-  enterResearchLooping(state);
+export function enterResearchSealedFromPersistedLog(state: ResearchPhaseState): void {
+  enterResearchSealed(state, { hasBaseline: true });
 }
 
-export function enterResearchLoopingFromFiles(state: ResearchPhaseState): void {
-  enterResearchLooping(state);
+export function enterResearchSealedFromFiles(
+  state: ResearchPhaseState,
+  options: { hasBaseline?: boolean } = {},
+): void {
+  enterResearchSealed(state, options);
 }
 
 export function enterResearchNeedsInitFromFiles(state: ResearchPhaseState): void {
@@ -100,16 +127,75 @@ export function enterResearchNeedsInitFromFiles(state: ResearchPhaseState): void
   state.lastRun = null;
 }
 
-function enterResearchLooping(state: ResearchPhaseState): void {
+function enterResearchSealed(
+  state: ResearchPhaseState,
+  options: { hasBaseline?: boolean },
+): void {
   state.mode = true;
-  state.phase = "looping";
+  state.phase = options.hasBaseline === false ? "needs_baseline" : "sealed";
   state.activationPrompt = null;
   state.activationTurns = 0;
   state.lastRun = null;
 }
 
-export function detectPhaseFromFiles(snapshot: Pick<ActivationSnapshot, "hasRules" | "hasConfig" | "hasBenchmarkScript">): ResearchPhase {
-  if (snapshot.hasConfig) return "looping";
+export function beginResearchFraming(state: ResearchPhaseState): void {
+  state.mode = true;
+  state.phase = "framing";
+  state.activationPrompt = null;
+  state.activationTurns = 0;
+  state.pendingResumeMessage = null;
+  state.lastRun = null;
+}
+
+export function enterResearchProbing(
+  state: ResearchPhaseState,
+  directions: Direction[],
+): PhaseTransition {
+  const ready = directionsReadyForProbing(directions);
+  if (!ready.ok) return { ok: false, phase: state.phase, reason: ready.reason };
+  state.mode = true;
+  state.phase = "probing";
+  state.activationPrompt = null;
+  state.lastRun = null;
+  return { ok: true, phase: state.phase };
+}
+
+export function enterResearchConverging(
+  state: ResearchPhaseState,
+  directions: Direction[],
+): PhaseTransition {
+  const closed = allDirectionsClosed(directions);
+  if (!closed.ok) return { ok: false, phase: state.phase, reason: closed.reason };
+  state.mode = true;
+  state.phase = "converging";
+  state.activationPrompt = null;
+  state.lastRun = null;
+  return { ok: true, phase: state.phase };
+}
+
+export function sealResearchContract(
+  state: ResearchPhaseState,
+  contract: GoalContract | null,
+  options: { hasBaseline?: boolean } = {},
+): PhaseTransition {
+  const ready = contractReadyToSeal(contract);
+  if (!ready.ok) return { ok: false, phase: state.phase, reason: ready.reason };
+  state.mode = true;
+  state.phase = options.hasBaseline ? "sealed" : "needs_baseline";
+  state.activationPrompt = null;
+  state.activationTurns = 0;
+  state.lastRun = null;
+  return { ok: true, phase: state.phase };
+}
+
+export function detectPhaseFromFiles(snapshot: {
+  hasRules: boolean;
+  hasConfig: boolean;
+  hasBenchmarkScript: boolean;
+  hasContract?: boolean;
+}): ResearchPhase {
+  if (snapshot.hasContract) return "sealed";
+  if (snapshot.hasConfig) return "sealed";
   if (snapshot.hasRules && snapshot.hasBenchmarkScript) return "needs_init";
   return "inactive";
 }
@@ -120,18 +206,14 @@ export function activateResearch(
   options: ResearchProtocolOptions,
 ): string {
   state.mode = true;
-  state.phase = activationPhase(snapshot);
+  const hasContract = snapshot.hasContract === true || snapshot.hasConfig;
+  state.phase = hasContract ? "sealed" : "framing";
   state.activationPrompt = snapshot.userGoal;
   state.activationTurns = 0;
   state.autoResumeTurns = 0;
   state.pendingResumeMessage = null;
   state.lastRun = null;
   return activationMessage(snapshot, options);
-}
-
-function activationPhase(snapshot: ActivationSnapshot): ResearchPhase {
-  if (!snapshot.hasConfig) return snapshot.hasRules && snapshot.hasBenchmarkScript ? "needs_init" : "activating";
-  return "looping";
 }
 
 export function deactivateResearch(state: ResearchPhaseState): void {
@@ -166,7 +248,7 @@ export function onResearchRunFinished(state: ResearchPhaseState, lastRun: LastRu
 export function onResearchRunLogged(state: ResearchPhaseState, limitReached: boolean): void {
   state.runsSinceAgentStart++;
   state.lastRun = null;
-  state.phase = limitReached ? "limit_reached" : "looping";
+  state.phase = limitReached ? "limit_reached" : "sealed";
   if (limitReached) state.mode = false;
 }
 
@@ -188,7 +270,7 @@ export function cancelPendingResearchPhaseResume(state: ResearchPhaseState): voi
 
 export function markResearchAutoResumeSent(state: ResearchPhaseState): void {
   state.autoResumeTurns++;
-  if (state.phase === "activating" || state.phase === "needs_init" || state.phase === "needs_baseline") {
+  if (SETUP_PHASES.includes(state.phase)) {
     state.activationTurns++;
   }
 }
@@ -200,10 +282,10 @@ export function hasReachedResearchAutoResumeLimit(state: ResearchPhaseState, opt
 export function shouldResearchAutoResumeAfterTurn(state: ResearchPhaseState, options: ResearchProtocolOptions): boolean {
   if (!state.mode) return false;
   if (state.phase === "awaiting_log") return true;
-  if (state.phase === "activating" || state.phase === "needs_init" || state.phase === "needs_baseline") {
+  if (SETUP_PHASES.includes(state.phase)) {
     return state.activationTurns < options.maxActivationTurns;
   }
-  if (state.phase === "looping") {
+  if (state.phase === "sealed") {
     return state.runsSinceAgentStart > 0;
   }
   return false;
