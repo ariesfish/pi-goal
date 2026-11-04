@@ -1,4 +1,8 @@
 import { inferMetricUnit } from "./metric-definition.ts";
+import {
+  emptyGoalProtocolState,
+  type GoalProtocolState,
+} from "./goal-contract.ts";
 export { inferMetricUnit };
 
 export interface ASI {
@@ -22,7 +26,7 @@ export interface MetricDef {
   unit: string;
 }
 
-export interface ResearchState {
+export interface ResearchState extends GoalProtocolState {
   results: RunResult[];
   bestMetric: number | null;
   bestDirection: "lower" | "higher";
@@ -37,6 +41,7 @@ export interface ResearchState {
 
 export function createResearchState(): ResearchState {
   return {
+    ...emptyGoalProtocolState(),
     results: [],
     bestMetric: null,
     bestDirection: "lower",
@@ -59,6 +64,34 @@ export function cloneResearchState(state: ResearchState): ResearchState {
       asi: result.asi ? { ...result.asi } : undefined,
     })),
     secondaryMetrics: state.secondaryMetrics.map((metric) => ({ ...metric })),
+    contract: state.contract
+      ? {
+          ...state.contract,
+          criteria: state.contract.criteria.map((criterion) => ({
+            ...criterion,
+            check: criterion.check ? { ...criterion.check } : undefined,
+            metric: criterion.metric ? { ...criterion.metric } : undefined,
+          })),
+          testGlobs: [...state.contract.testGlobs],
+        }
+      : null,
+    directions: state.directions.map((direction) => ({
+      ...direction,
+      evidence: direction.evidence ? { ...direction.evidence } : undefined,
+    })),
+    probes: state.probes.map((probe) => ({ ...probe })),
+    gates: state.gates.map((gate) => ({
+      ...gate,
+      criteria: gate.criteria.map((verdict) => ({ ...verdict })),
+    })),
+    reviews: state.reviews.map((review) => ({
+      ...review,
+      findings: review.findings.map((finding) => ({
+        ...finding,
+        repro: finding.repro ? { ...finding.repro } : undefined,
+      })),
+    })),
+    attempts: state.attempts.map((attempt) => ({ ...attempt })),
   };
 }
 

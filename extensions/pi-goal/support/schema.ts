@@ -1,5 +1,20 @@
-import { StringEnum } from "@earendil-works/pi-ai";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
+
+/**
+ * String enum schema that stays in the same typebox instance as the rest of
+ * the tool schemas. pi-ai's StringEnum comes from a second typebox copy, which
+ * breaks parameter inference inside Type.Object.
+ */
+function stringEnum<T extends readonly string[]>(
+  values: T,
+  options?: { description?: string },
+) {
+  return Type.Unsafe<T[number]>({
+    type: "string",
+    enum: [...values],
+    ...options,
+  });
+}
 
 export const RunParams = Type.Object({
   command: Type.String({
@@ -57,13 +72,14 @@ export const LogParams = Type.Object({
     description:
       "The primary optimization metric value (e.g. seconds, val_bpb). 0 for crashes.",
   }),
-  status: StringEnum(["keep", "discard", "crash", "checks_failed"] as const),
+  status: stringEnum(["keep", "discard", "crash", "checks_failed"] as const),
   description: Type.String({
     description: "Short description of what this experiment tried",
   }),
   metrics: Type.Optional(
-    Type.Object({}, {
-      additionalProperties: Type.Number(),
+    Type.Unsafe<Record<string, number>>({
+      type: "object",
+      additionalProperties: { type: "number" },
       description:
         'Additional metrics to track as { name: value } pairs, e.g. { "compile_µs": 4200, "render_µs": 9800 }. These are shown alongside the primary metric for tradeoff monitoring.',
     })
@@ -75,8 +91,9 @@ export const LogParams = Type.Object({
     })
   ),
   asi: Type.Optional(
-    Type.Object({}, {
-      additionalProperties: Type.Unknown(),
+    Type.Unsafe<Record<string, unknown>>({
+      type: "object",
+      additionalProperties: {},
       description:
         'Actionable Side Information — structured diagnostics for this run. Free-form key/value pairs. Parsed ASI from run_goal output is merged automatically; use this to add or override fields.',
     })

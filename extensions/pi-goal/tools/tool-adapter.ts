@@ -40,7 +40,7 @@ export function resolveResearchToolContext(
   };
 }
 
-export function textToolResult(text: string, details: Record<string, unknown> = {}) {
+export function textToolResult(text: string, details: object = {}) {
   return {
     content: [{ type: "text" as const, text }],
     details,

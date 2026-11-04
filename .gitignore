@@ -40,3 +40,6 @@ Thumbs.db
 .vite/
 dist/
 build/
+
+# Per-developer process memory
+.dev/

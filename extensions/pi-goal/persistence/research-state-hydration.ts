@@ -41,6 +41,34 @@ export function hydrateResearchStateFromJournalModel(state: ResearchState, model
     asi: result.asi ? { ...result.asi } : undefined,
   }));
   state.secondaryMetrics = model.secondaryMetrics.map((metric) => ({ ...metric }));
+  state.contract = model.contract
+    ? {
+        ...model.contract,
+        criteria: model.contract.criteria.map((criterion) => ({
+          ...criterion,
+          check: criterion.check ? { ...criterion.check } : undefined,
+          metric: criterion.metric ? { ...criterion.metric } : undefined,
+        })),
+        testGlobs: [...model.contract.testGlobs],
+      }
+    : null;
+  state.directions = model.directions.map((direction) => ({
+    ...direction,
+    evidence: direction.evidence ? { ...direction.evidence } : undefined,
+  }));
+  state.probes = model.probes.map((probe) => ({ ...probe }));
+  state.gates = model.gates.map((gate) => ({
+    ...gate,
+    criteria: gate.criteria.map((verdict) => ({ ...verdict })),
+  }));
+  state.reviews = model.reviews.map((review) => ({
+    ...review,
+    findings: review.findings.map((finding) => ({
+      ...finding,
+      repro: finding.repro ? { ...finding.repro } : undefined,
+    })),
+  }));
+  state.attempts = model.attempts.map((attempt) => ({ ...attempt }));
 
   if (state.results.length === 0) return false;
   state.bestMetric = findBaselineMetric(state.results, state.currentExperimentIndex);
