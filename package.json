@@ -1,6 +1,6 @@
 {
   "name": "@ariesfish/pi-goal",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "type": "module",
   "description": "Autonomous experiment loop for pi \u2014 run, measure, keep or discard. Inspired by karpathy/autoresearch.",
   "keywords": [

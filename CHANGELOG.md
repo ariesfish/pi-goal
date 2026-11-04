@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.2] - 2026-11-04
+
+### Added
+
+- Sealed-mode shell write interception: redirection, `tee`, in-place `sed`/`perl`, `cp`/`mv`/`install`, `dd of=`, and `truncate` targeting protected test, benchmark, or research-state paths are blocked. Arbitrary interpreters remain a residual bypass.
+
+### Changed
+
+- Local `goal.config.json` is gitignored; this repository's dogfood config uses the `cfgpu/glm-5-3` reviewer with `thinking: "max"`.
+
 ## [0.5.1] - 2026-11-04
 
 ### Added

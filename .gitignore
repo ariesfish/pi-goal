@@ -16,6 +16,7 @@ coverage/
 .goal/
 goal.jsonl
 goal.md
+goal.config.json
 goal.dashboard.html
 
 # Local scratch / agent working state
