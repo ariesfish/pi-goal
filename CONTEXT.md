@@ -25,8 +25,36 @@ The persistent storage location for one research effort's files and journal.
 _Avoid_: session folder, runtime directory.
 
 **Research Journal**:
-The append-only record of research configuration and run results.
+The append-only record of research configuration, protocol entries, and run results.
 _Avoid_: session state, runtime state.
+
+**Goal Contract**:
+The frozen set of criteria that decides whether a run is kept: one primary metric, optional guard metrics, and an executable check for every blocking criterion. Sealing it requires one human confirmation.
+_Avoid_: plan, spec, goal file.
+
+**Criterion**:
+One column of the Goal Contract. A criterion is `metric`, `command`, `test`, or `manual`; only non-manual criteria can block.
+_Avoid_: check, assertion.
+
+**Gate**:
+The deterministic verdict over the Goal Contract and the current workspace: every criterion check, scope check, and test-file protection. The gate, not the model, decides keep or discard.
+_Avoid_: review, score.
+
+**Direction**:
+One orthogonal way to pursue the goal, with a mechanism, proxy metric, cost, risk, and kill condition.
+_Avoid_: option, idea.
+
+**Probe**:
+One timeboxed measurement of a Direction. A probe ends kept or killed and carries an evidence pointer.
+_Avoid_: experiment, trial.
+
+**Attempt**:
+A run that was reverted. Its diff is retained as a patch so the failure remains available as evidence.
+_Avoid_: failed run, discard.
+
+**Review Finding**:
+One claim from the optional reviewer. A finding blocks only when its repro is executed and fails.
+_Avoid_: comment, issue.
 
 **Experiment**:
 A comparable measurement phase within a research effort, with its own objective framing, primary metric, direction, workload, measurement method, and baseline.
@@ -77,7 +105,12 @@ _Avoid_: research session, experiment state.
 - A **Project** may contain many **Research** efforts.
 - A **Project** has at most one **Active Research** at a time.
 - A **Research** has one **Research Identity** and one **Research Directory**.
-- A **Research Directory** contains one **Research Journal**.
+- A **Research Directory** contains one **Research Journal** and an `attempts/` directory of reverted-attempt patches.
+- A **Research** has at most one **Goal Contract**; it is frozen before the first baseline run.
+- Before a **Goal Contract** exists, a **Research** moves through framing, probing, and converging; each transition is code-enforced.
+- A **Gate** evaluates every blocking **Criterion** against a candidate **Run**. A failed gate means the run cannot be kept.
+- A **Direction** produces zero or more **Probes**. All Active Research directions close before the contract can be frozen.
+- A reverted **Run** produces one **Attempt**; a kept run produces a commit.
 - A **Research** contains one or more **Experiments**.
 - Initializing a **Research** creates its first **Experiment**.
 - An **Experiment Start** creates another **Experiment** within the **Active Research**; it does not create a new **Research**.
@@ -105,3 +138,4 @@ _Avoid_: research session, experiment state.
 - "experiment result" was used for logged run entries — resolved: use **Run Result**.
 - "segment" was used for re-initialized experiment scopes — resolved: use **Experiment** in domain language.
 - "re-init" was used for both initializing a **Research** and starting another **Experiment** — resolved: use **Experiment Start** for the latter.
+- "goal" was used for the user-facing target, the `goal.md` narrative, and the frozen criteria — resolved: **Goal Contract** is the frozen criteria artifact; `goal.md` is narrative only and never parsed for state.

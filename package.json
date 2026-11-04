@@ -1,6 +1,6 @@
 {
   "name": "@ariesfish/pi-goal",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "description": "Autonomous experiment loop for pi \u2014 run, measure, keep or discard. Inspired by karpathy/autoresearch.",
   "keywords": [
@@ -47,7 +47,8 @@
   "scripts": {
     "test": "node --experimental-strip-types --test \"tests/**/*.test.mjs\"",
     "test:finalize": "bash tests/scripts/finalize_test.sh",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "node --experimental-strip-types tests/scripts/e2e_protocol.mjs"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": ">=1.5.0",

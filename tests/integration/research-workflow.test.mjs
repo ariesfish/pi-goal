@@ -214,6 +214,6 @@ test("Active Research selection keeps separate journals and summaries for differ
     assert.equal(summaryA.currentExperiment.baseline?.description, "test baseline");
     assert.equal(summaryB.metricName, "bundle_kb");
     assert.equal(summaryB.currentExperiment.baseline?.description, "bundle baseline");
-    assert.equal(readJournalEntries(workDir).length, 2);
+    assert.equal(readJournalEntries(workDir).length, 4);
   });
 });

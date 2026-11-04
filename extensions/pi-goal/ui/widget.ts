@@ -100,8 +100,14 @@ export function createWidgetController(options: {
           const baseline = summary.currentExperiment.baseline;
           const best = summary.currentExperiment.best;
           const displayVal = best?.metric ?? baseline?.metric ?? null;
+          const blockingTotal = state.contract?.criteria.filter((criterion) => criterion.blocking).length ?? 0;
+          const lastGate = state.gates.at(-1);
+          const blockingPassed = lastGate
+            ? lastGate.criteria.filter((verdict) => verdict.blocking && verdict.pass).length
+            : 0;
           const essential = [
             theme.fg("accent", "🎯"),
+            theme.fg("muted", ` ${runtime.loop.phase}`),
             theme.fg("muted", ` ${state.results.length} runs`),
             theme.fg("success", ` ${kept} kept`),
             theme.fg("dim", " │ "),
@@ -110,6 +116,9 @@ export function createWidgetController(options: {
               theme.bold(`★ ${state.metricName}: ${formatMetricValue(displayVal, state.metricUnit)}`)
             ),
             best ? theme.fg("dim", ` #${best.runNumber}`) : "",
+            blockingTotal > 0
+              ? theme.fg("dim", ` │ ${blockingPassed}/${blockingTotal} criteria`)
+              : "",
           ];
 
           const optional: string[] = [];

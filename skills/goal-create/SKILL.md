@@ -19,7 +19,22 @@ Autonomous experiment loop: try ideas, keep what works, discard what doesn't, ne
 2. `git checkout -b goal/<goal>-<date>`
 3. Read the source files. Understand the workload deeply before writing anything.
 4. Write `goal.md` and `goal.sh` (see below). Commit both.
-5. `init_goal` → run baseline → `log_goal` → start looping immediately.
+5. **Frame** the goal with `frame_goal`: at least two orthogonal directions. Each card needs a mechanism, a proxy metric, a cost, a risk, and a kill condition.
+6. **Probe** each direction with `probe_goal`. Each probe is timeboxed, produces a number or a binary observable, and ends kept or killed with an evidence pointer.
+7. **Freeze** the contract with `freeze_criteria`: one blocking metric criterion as the primary target, guard criteria, and an executable check for every blocking criterion. The human confirms once.
+8. Run the baseline with `run_goal`, then `log_goal`. The loop starts immediately.
+
+**Fast path:** if the goal is already a single clear metric, skip steps 5-7 and call `init_goal`; it creates a one-criterion contract and moves straight to the baseline. Use `start_goal` only when the metric or baseline comparability changes inside a single-metric research.
+
+### Contract criteria
+
+- `metric` — the primary target; also compare guard metrics against the baseline.
+- `command` / `test` — an executable check with `exit0`, `stdout_contains`, or `stdout_regex`.
+- `manual` — advisory only; a manual criterion cannot block.
+- `test_globs` — protected test files; the sealed phase blocks edits unless the human runs `/goal allow-tests`.
+- `scope_globs` — changed paths outside these globs fail the gate.
+
+A failed gate means `log_goal` with `status: keep` is rejected. Log the attempt as `discard` with the failure in `asi`; the code is reverted and the diff is kept under `.goal/researches/<id>/attempts/`.
 
 ### `goal.md`
 
@@ -87,11 +102,13 @@ JSON config file that lives in the pi session's working directory (`ctx.cwd`). S
 
 - **`maxIterations`** (number) — maximum experiments before auto-stopping.
 - **`workingDir`** (string) — override the directory for all goal operations: file I/O (`goal.jsonl`, `goal.md`, `goal.sh`, `goal.checks.sh`, `goal.ideas.md`), command execution, and git operations. Supports absolute paths or relative paths (resolved against `ctx.cwd`). The config file itself always stays in `ctx.cwd`. Fails if the directory doesn't exist.
+- **`reviewer`** — optional blind reviewer. `command` is required; `args`, `timeoutSeconds`, and `blocking` are optional. The reviewer gets JSON on stdin (diff + criteria + gate) and must return `{ "findings": [...] }`. Each finding's `repro` is executed; `blocking: true` lets a reproduced blocking finding deny a keep.
 
 ```json
 {
   "workingDir": "/path/to/project",
-  "maxIterations": 50
+  "maxIterations": 50,
+  "reviewer": { "command": "codex", "args": ["exec", "--json"] }
 }
 ```
 
@@ -122,7 +139,7 @@ pnpm typecheck 2>&1 | grep -i error || true
 
 **LOOP FOREVER.** Never ask "should I continue?" — the user expects autonomous work.
 
-- **Primary metric is king.** Improved → `keep`. Worse/equal → `discard`. Secondary metrics rarely affect this.
+- **The gate decides.** Improved primary metric → `keep` only when every blocking criterion passes. Worse/equal or a failed gate → `discard`. Secondary metrics rarely change the decision.
 - **Annotate every run with `asi`.** Record what you learned — not what you did. What would help the next iteration or a fresh agent resuming this session?
 - **Watch the confidence score.** After 3+ runs, `log_goal` reports a confidence score (best improvement as a multiple of the session noise floor). ≥2.0× means the improvement is likely real. <1.0× means it's within noise — consider re-running to confirm before keeping. The score is advisory — it never auto-discards.
 - **Simpler is better.** Removing code for equal perf = keep. Ugly complexity for tiny gain = probably discard.

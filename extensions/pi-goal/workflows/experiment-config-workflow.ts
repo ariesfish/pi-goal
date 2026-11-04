@@ -4,7 +4,8 @@ import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
 import { cloneResearchState, type ResearchState } from "../domain/research-state.ts";
 import type { HookPayload } from "../execution/hooks.ts";
 import { readRunLimit } from "../persistence/goal-config.ts";
-import { appendExperimentConfigToJournal } from "../persistence/research-journal.ts";
+import { legacyMetricContract, isLegacyMetricContract } from "../domain/goal-contract.ts";
+import { appendExperimentConfigToJournal, appendJournalEntry, contractJournalEntry } from "../persistence/research-journal.ts";
 import { onResearchInitialized } from "../protocol/research-phase.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import {
@@ -73,9 +74,25 @@ export async function executeExperimentConfigWorkflow(
 
   applyExperimentConfigState(state, params, startsLaterExperiment, ctxCwd);
 
+  if (state.contract && !isLegacyMetricContract(state.contract)) {
+    return {
+      ok: false,
+      text: "❌ The active research has a frozen multi-criterion contract. Changing the metric requires a new research effort; use /goal select or start a new research instead of start_goal.",
+    };
+  }
+
   const journalError = appendExperimentConfigToJournal(workDir, state);
   if (journalError) {
     return { ok: false, text: journalError };
+  }
+
+  state.contract = legacyMetricContract({
+    metricName: state.metricName,
+    direction: state.bestDirection,
+  });
+  const contractError = appendJournalEntry(workDir, contractJournalEntry(state.contract));
+  if (contractError) {
+    return { ok: false, text: contractError };
   }
   deps.broadcastDashboardUpdate(workDir);
 

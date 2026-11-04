@@ -51,5 +51,8 @@ export async function applyKeptRunResultTransaction(
 export async function restoreRejectedRunResultTransaction(
   options: RestoreRejectedRunOptions,
 ): Promise<RestoreRejectedRunResult> {
+  // Keeps are committed, never reverted; the status type omits keep, but the
+  // workflow passes every status through this seam.
+  if ((options.status as string) === "keep") return { text: "", attempt: null };
   return restoreRejectedRunResult(options);
 }

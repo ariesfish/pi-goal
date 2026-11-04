@@ -1,14 +1,14 @@
 <div align="center">
 
 # pi-goal
-### Autonomous experiment loops for pi
-**[Install](#install)** · **[Usage](#usage)** · **[Reference](#reference)**
+### Goal protocol for pi: frame, probe, freeze, then run
+**[Install](#install)** · **[Usage](#usage)** · **[Protocol](#the-goal-protocol)** · **[Reference](#reference)**
 
 </div>
 
-*pi-goal lets pi try an idea, measure it, keep improvements, revert regressions, and continue from durable state.*
+*pi-goal turns a fuzzy goal into a frozen contract, then runs measured attempts: keep what passes the gate, revert what does not, and keep the failed diff as evidence.*
 
-Use it for any measurable optimization target: test speed, bundle size, training loss, build time, Lighthouse score, or custom benchmarks.
+Use it for measurable work: test speed, bundle size, training loss, build time, Lighthouse scores, or feature work with checks you can run.
 
 ---
 
@@ -17,6 +17,8 @@ Use it for any measurable optimization target: test speed, bundle size, training
 ```bash
 pi install npm:@ariesfish/pi-goal
 ```
+
+Requires **pi >= 1.5.0** (the `agent_before_settle` boundary drives the loop).
 
 Manual install:
 
@@ -33,7 +35,7 @@ Then run `/reload` in pi.
 
 ## Usage
 
-### Start a loop
+### Start a goal
 
 ```text
 /skill:goal-create
@@ -42,12 +44,11 @@ Then run `/reload` in pi.
 The skill asks for, or infers:
 
 - goal
-- benchmark command
-- primary metric and direction
+- benchmark command and primary metric
 - files in scope
-- constraints
+- hard constraints
 
-It creates a goal branch, writes `goal.md` and `goal.sh`, runs the baseline, then starts iterating.
+It creates a goal branch, writes `goal.md` and `goal.sh`, then frames at least two directions, probes each, and freezes the contract before the baseline.
 
 ### Run directly with `/goal`
 
@@ -56,8 +57,6 @@ It creates a goal branch, writes `goal.md` and `goal.sh`, runs the baseline, the
 /goal model training, run 5 minutes of train.py and track validation loss
 ```
 
-Useful subcommands:
-
 | Command | Purpose |
 |---|---|
 | `/goal <text>` | Start or resume goal mode |
@@ -65,80 +64,114 @@ Useful subcommands:
 | `/goal clear` | Delete `goal.jsonl` and reset state |
 | `/goal reinit` | Start a new comparable experiment with a fresh baseline |
 | `/goal select <goal-id>` | Switch active research under `.goal/researches/` |
+| `/goal allow-tests` | Unlock test-file edits for this research |
+| `/goal protect-tests` | Restore the sealed test-file block |
 | `/goal export` | Open the live browser dashboard |
 
 ### The loop
 
-pi edits code, commits candidates, calls `run_goal`, then calls `log_goal`:
-
 ```text
-edit → commit → run_goal → log_goal → keep or revert → repeat
+edit → run_goal → check_goal → log_goal → keep or revert → repeat
 ```
 
-Results are appended to `goal.jsonl`. The current plan and learnings live in `goal.md`, so a fresh agent can resume after restarts or context compaction.
-
-### Finalize results
-
-```text
-/skill:goal-finalize
-```
-
-This reads `goal.jsonl`, groups kept runs into logical changesets, asks for approval, then creates one reviewable branch per group from the merge base.
+`log_goal` runs the gate itself on `keep`, so `check_goal` is optional. A rejected keep writes an attempt patch, resets the worktree to the checkpoint, and tells you what failed.
 
 ---
 
-## What it installs
+## The goal protocol
 
-### Extension tools
+```text
+inactive → framing → probing → converging → needs_baseline → sealed
+```
+
+| Phase | Code-enforced entry condition |
+|---|---|
+| framing | no frozen contract yet |
+| probing | at least two complete direction cards (mechanism, proxy metric, cost, risk, kill condition) |
+| converging | every direction closed as kept or killed with an evidence pointer |
+| needs_baseline | contract frozen and hashed; every blocking criterion has an executable check |
+| sealed | baseline logged; keeps require a passing gate |
+
+A legacy metric-only research hydrates a one-criterion contract and enters `needs_baseline` or `sealed` without migration.
+
+---
+
+## Tools
 
 | Tool | Purpose |
 |---|---|
-| `init_goal` | Initialize the active research and first experiment |
+| `frame_goal` | Register at least two orthogonal direction cards and enter probing |
+| `probe_goal` | Run one timeboxed probe, record value + output hash, close the direction |
+| `freeze_criteria` | Validate, hash, and freeze the contract after one human confirmation |
+| `init_goal` | Initialize a single-metric research (fast path) |
 | `start_goal` | Open a new comparable experiment with a fresh baseline |
 | `run_goal` | Time a command, capture output, parse `METRIC name=value` lines |
-| `log_goal` | Record the run, keep improvements, revert failures/regressions |
-| `validate_goal` | Check goal files, metric output, checks, and workspace safety |
-
-### Skills
-
-| Skill | Purpose |
-|---|---|
-| `goal-create` | Set up and start an optimization loop |
-| `goal-finalize` | Turn a noisy goal branch into clean review branches |
-| `goal-hooks` | Help author optional `goal.hooks/before.sh` and `after.sh` scripts |
-
-### Files used by a loop
-
-| File | Purpose |
-|---|---|
-| `goal.md` | Goal, metric, scope, constraints, attempts, learnings |
-| `goal.sh` | Benchmark script; should output `METRIC name=value` |
-| `goal.jsonl` | Append-only run journal |
-| `goal.checks.sh` | Optional correctness checks after successful benchmarks |
-| `goal.ideas.md` | Optional backlog of promising ideas |
-| `goal.hooks/` | Optional scripts fired before/after iterations |
+| `check_goal` | Run the gate without logging a run |
+| `log_goal` | Record the run, enforce the gate, commit keeps, revert rejects |
+| `validate_goal` | Check files, metric output, checks, and workspace safety |
+| `review_goal` | Run the optional blind reviewer and verify its findings |
 
 ---
 
-## UI
+## The gate
 
-- Status widget above the editor: `🎯 goal 12 runs 8 kept │ ★ total_µs: 15,200 (-12.3%) │ conf: 2.1×`
-- `Ctrl+Shift+T`: expand/collapse inline dashboard
-- `Ctrl+Shift+F`: fullscreen scrollable dashboard
-- `/goal export`: live browser dashboard with chart and share card
+`log_goal` with `status: keep` is rejected unless every blocking criterion passes.
 
-Override shortcuts in `<agent-dir>/extensions/pi-goal.json`:
+- **Criteria checks** — `exit0`, `stdout_contains`, or `stdout_regex` on a command; metric criteria compare against the experiment baseline.
+- **Noise gate** — an improvement below `1.0x` confidence needs `force_keep: true` plus a reason in `asi`.
+- **Test protection** — test files matching the contract's `test_globs` cannot change unless `allow_test_edits` is set or the human ran `/goal allow-tests`.
+- **Scope** — with `scope_globs`, changed paths outside them fail the gate.
+- **Reviewer** — optional; a finding blocks only when its repro is executed and fails, and only with `reviewer.blocking: true`.
+
+Kept commits carry `Gate:` and `Criteria:` trailers so the decision is auditable.
+
+---
+
+## Files used by a loop
+
+| File | Purpose |
+|---|---|
+| `goal.md` | Narrative: objective, metric, scope, constraints, learnings |
+| `goal.sh` | Benchmark script; emits `METRIC name=value` |
+| `goal.jsonl` | Append-only journal: config, contract, directions, probes, gates, reviews, attempts, runs |
+| `goal.checks.sh` | Optional correctness checks after a passing benchmark |
+| `goal.ideas.md` | Optional backlog of deferred ideas |
+| `goal.hooks/` | Optional `before.sh` / `after.sh` scripts |
+| `.goal/researches/<id>/attempts/` | Reverted attempt diffs, one patch per run |
+
+---
+
+## Reviewer (optional)
+
+Add a reviewer to `goal.config.json`:
 
 ```json
 {
-  "shortcuts": {
-    "toggleDashboard": "ctrl+shift+y",
-    "fullscreenDashboard": null
+  "reviewer": {
+    "command": "codex",
+    "args": ["exec", "--json"],
+    "timeoutSeconds": 180,
+    "blocking": false
   }
 }
 ```
 
-Use `null` to disable a shortcut.
+The reviewer receives JSON on stdin — diff, frozen criteria, changed paths, and the last gate — never the implementer's summary. It must return JSON findings:
+
+```json
+{
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "blocking",
+      "claim": "shared fixture leaks state",
+      "repro": { "kind": "command", "payload": "pnpm test -- tests/order.test.ts" }
+    }
+  ]
+}
+```
+
+The extension runs every `repro`. A finding without a repro, or whose repro passes, is advisory. With `blocking: true`, one reproduced blocking finding denies the keep. Precision (`reproduced / blocking`) is reported so you can decide whether the reviewer has earned blocking power.
 
 ---
 
@@ -152,7 +185,7 @@ Use `null` to disable a shortcut.
 METRIC total_ms=123.4
 ```
 
-Secondary metrics can use the same format:
+Secondary metrics use the same format:
 
 ```text
 METRIC bundle_kb=42.1
@@ -160,7 +193,7 @@ METRIC bundle_kb=42.1
 
 ### Backpressure checks
 
-Create executable `goal.checks.sh` to block unsafe keeps:
+Create executable `goal.checks.sh` to add extra checks after a passing benchmark:
 
 ```bash
 #!/bin/bash
@@ -169,7 +202,7 @@ pnpm test
 pnpm typecheck
 ```
 
-Checks run after a benchmark exits 0. Their runtime does not affect the primary metric. Failures are logged as `checks_failed` and code changes are reverted.
+Checks run after a benchmark exits 0. Failures are logged as `checks_failed` and code changes are reverted. The richer per-criterion equivalent is `freeze_criteria`.
 
 ### Confidence score
 
@@ -181,11 +214,9 @@ confidence = |best improvement| / MAD
 
 | Score | Meaning |
 |---|---|
-| `≥ 2.0×` | likely real improvement |
-| `1.0–2.0×` | above noise but marginal |
-| `< 1.0×` | within noise; rerun to confirm |
-
-The score is advisory. It never auto-discards.
+| `≥ 2.0x` | likely real improvement |
+| `1.0–2.0x` | above noise but marginal |
+| `< 1.0x` | within noise; rerun or pass `force_keep` |
 
 ### Configuration
 
@@ -194,14 +225,16 @@ Create `goal.config.json` in the pi session directory:
 ```json
 {
   "workingDir": "/path/to/project",
-  "maxIterations": 50
+  "maxIterations": 50,
+  "reviewer": { "command": "codex", "args": ["exec", "--json"] }
 }
 ```
 
 | Field | Purpose |
 |---|---|
 | `workingDir` | Override where goal files, commands, and git operations run |
-| `maxIterations` | Stop after this many runs until a new experiment is started |
+| `maxIterations` | Stop after this many runs until a new experiment starts |
+| `reviewer` | Optional blind reviewer (see above) |
 
 ### Hooks
 
@@ -212,7 +245,16 @@ Optional executable hooks live in `goal.hooks/`:
 | `before.sh` | before activation and after each completed run | fetch research, rotate ideas, prime context |
 | `after.sh` | after each `log_goal` | append learnings, notify, tag winners |
 
-Hooks receive one JSON object on stdin, write steer text on stdout, timeout after 30s, and append hook entries to `goal.jsonl`. See [`skills/goal-hooks/examples/`](skills/goal-hooks/examples/) for complete scripts.
+Hooks receive one JSON object on stdin, write steer text on stdout, timeout after 30s, and append hook entries to `goal.jsonl`.
+
+### UI
+
+- Status widget: `🎯 sealed 12 runs 8 kept │ ★ total_µs: 15,200 (-12.3%) │ 3/4 criteria`
+- `Ctrl+Shift+T`: expand/collapse inline dashboard
+- `Ctrl+Shift+F`: fullscreen scrollable dashboard
+- `/goal export`: live browser dashboard
+
+Override shortcuts in `<agent-dir>/extensions/pi-goal.json`.
 
 ---
 
@@ -226,15 +268,11 @@ Hooks receive one JSON object on stdin, write steer text on stdout, timeout afte
 | Build speed | seconds ↓ | `pnpm build` |
 | Lighthouse | score ↑ | `lighthouse http://localhost:3000 --output=json` |
 
----
-
 ## Prerequisites
 
-- pi installed and configured
+- pi >= 1.5.0
 - an LLM provider API key
 - a benchmark command with a numeric metric
-
-Goal loops can run for a long time. Use provider-side budgets and `maxIterations` to cap cost.
 
 ## License
 

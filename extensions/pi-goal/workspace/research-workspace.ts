@@ -106,7 +106,11 @@ export async function commitKeptRunResult(
     const commitMsg = `${options.description}\n\n${trailers.join("\n")}`;
 
     const execOpts = { cwd: options.workDir, timeout: 10000 };
-    const addResult = await options.pi.exec("git", ["add", "-A"], execOpts);
+    const addResult = await options.pi.exec(
+      "git",
+      ["add", "-A", "--", ".", ":(exclude).goal", ":(exclude,glob)**/.goal/**"],
+      execOpts,
+    );
     if (addResult.code !== 0) {
       const addErr = (addResult.stdout + addResult.stderr).trim();
       throw new Error(`git add failed (exit ${addResult.code}): ${addErr.slice(0, 200)}`);

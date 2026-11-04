@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.5.0] - 2026-11-04
+
+### Added
+
+- Phased goal protocol: framing, probing, converging, and sealed, with code-enforced transitions.
+- Goal Contract: metric/command/test/manual criteria, scope globs, test protection, frozen hash, and one human confirmation.
+- New tools: `frame_goal`, `probe_goal`, `freeze_criteria`, `check_goal`, and `review_goal`.
+- Deterministic gate for keeps: criteria checks, noise gate, scope check, test-file protection, and commit trailers.
+- Rejected runs reset to the checkpoint and retain their diff under `.goal/researches/<id>/attempts/`.
+- Optional blind reviewer: diff + criteria + gate in, structured findings out, every repro executed before it can block. Precision is reported.
+- `/goal allow-tests` and `/goal protect-tests` persist a policy entry in the journal.
+- `reviewer` configuration and an attempt directory per research.
+- Status widget shows the phase and blocking-criteria progress.
+
+### Changed
+
+- Loop continuation uses pi's `agent_before_settle` boundary instead of `agent_end` plus a timer.
+- Guards stop the loop after 200 auto-resume turns, 10 consecutive failures, or 8 rounds without a kept improvement.
+- `init_goal` writes a one-criterion contract; `start_goal` is rejected on a multi-criterion frozen contract.
+- Kept commits exclude `.goal/` and carry `Gate:` and `Criteria:` trailers.
+
+### Breaking
+
+- Requires pi >= 1.5.0.
+- Tool schemas use typebox v1 (`typebox` peer instead of `@sinclair/typebox`).
+
 ## [0.4.0] - 2026-05-26
 
 ### Changed

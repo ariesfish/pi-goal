@@ -62,7 +62,7 @@ test("experiment config workflow initializes Research and writes the first Exper
     assert.equal(runtime.loop.phase, "needs_baseline");
     assert.equal(broadcasted, true);
     const lines = fs.readFileSync(activeResearch(workDir).paths.journal, "utf-8").trim().split("\n");
-    assert.equal(lines.length, 1);
+    assert.equal(lines.length, 2);
     assert.deepEqual(JSON.parse(lines[0]), {
       type: "config",
       name: "Speed",
@@ -70,6 +70,8 @@ test("experiment config workflow initializes Research and writes the first Exper
       metricUnit: "ms",
       bestDirection: "lower",
     });
+    assert.equal(JSON.parse(lines[1]).type, "contract");
+    assert.equal(runtime.state.contract?.criteria[0].metric?.name, "total_ms");
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
   }
@@ -140,8 +142,41 @@ test("experiment config workflow starts a later Experiment and resets comparison
     assert.equal(runtime.state.confidence, null);
     assert.match(result.text, /new experiment started/);
     const lines = fs.readFileSync(activeResearch(workDir).paths.journal, "utf-8").trim().split("\n");
-    assert.equal(lines.length, 2);
+    assert.equal(lines.length, 3);
     assert.equal(JSON.parse(lines[1]).metricName, "p95_ms");
+    assert.equal(JSON.parse(lines[2]).type, "contract");
+  } finally {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("experiment config workflow rejects start_goal on a multi-criterion contract", async () => {
+  const workDir = setupProject();
+  try {
+    const runtime = createSessionRuntime();
+    runtime.state.contract = {
+      version: 1,
+      objective: "cut test time",
+      criteria: [
+        { id: "C1", statement: "faster", kind: "metric", blocking: true, metric: { name: "total_ms", direction: "lower" } },
+        { id: "C2", statement: "passes", kind: "command", blocking: true, check: { command: "true", expect: "exit0" } },
+      ],
+      testGlobs: [],
+      scopeGlobs: [],
+      allowTestEdits: false,
+      frozenAt: 1,
+      hash: "sha256:test",
+    };
+
+    const result = await executeExperimentConfigWorkflow({
+      name: "Speed v2",
+      metric_name: "p95_ms",
+      metric_unit: "ms",
+      direction: "lower",
+    }, deps(workDir, runtime, { kind: "start_goal", title: "Experiment started" }));
+
+    assert.equal(result.ok, false);
+    assert.match(result.text, /frozen multi-criterion contract/);
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
   }
