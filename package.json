@@ -26,7 +26,6 @@
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@10.28.2",
   "pi": {
     "extensions": [
       "./extensions"
