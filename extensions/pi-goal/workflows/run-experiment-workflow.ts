@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
+import { findBestMetric } from "../domain/research-state.ts";
 import { currentRuns, type ResearchState } from "../domain/research-state.ts";
 import {
   isGoalShCommand,
@@ -109,7 +110,7 @@ export async function executeRunExperimentWorkflow(
     truncation,
     fullOutputPath,
     requirePrimaryMetric: shouldUseScriptCommandOnly(fileContract),
-    bestMetric: state.bestMetric,
+    bestMetric: findBestMetric(state.results, state.currentExperimentIndex, state.bestDirection) ?? state.bestMetric,
   });
 
   return {

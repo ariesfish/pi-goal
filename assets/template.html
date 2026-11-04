@@ -534,7 +534,7 @@
     }
 
     function runLabel(run, index) {
-      return '#' + (run.run || (index + 1));
+      return '#' + escapeHtml(String(run.run || (index + 1)));
     }
 
     function metricDisplay(run) {
@@ -562,7 +562,7 @@
         td(statusBadge(run.status)),
         td(escapeHtml(metricDisplay(run)), 'mono'),
         td(delta.text, delta.className),
-        td(formatConfidence(run.confidence), 'mono'),
+        td(escapeHtml(formatConfidence(run.confidence)), 'mono'),
         td(escapeHtml(run.commit || ''), 'mono muted'),
         td(escapeHtml(run.description || '')),
         td(asiField(run, 'hypothesis')),
@@ -915,7 +915,7 @@
     }
 
     function tooltipStatus(run) {
-      return '<span class="tt-status ' + run.status + '">' + escapeHtml(run.status) + '</span>';
+      return '<span class="tt-status ' + statusClass(run.status) + '">' + escapeHtml(run.status) + '</span>';
     }
 
     function tooltipDescription(run) {
@@ -943,8 +943,12 @@
       return 10 * magnitude;
     }
 
+    function statusClass(status) {
+      return ['keep', 'discard', 'crash', 'checks_failed'].includes(status) ? status : 'unknown';
+    }
+
     function statusBadge(status) {
-      return '<span class="status ' + status + '">' + escapeHtml(status) + '</span>';
+      return '<span class="status ' + statusClass(status) + '">' + escapeHtml(status) + '</span>';
     }
 
     function computeImprovementPercent(baseline, best, direction) {

@@ -120,8 +120,13 @@ export async function runHook(payload: HookPayload): Promise<HookResult> {
     child.on("error", (err) => finish(null, err.message));
     child.on("close", (code) => finish(code));
 
-    child.stdin.write(JSON.stringify(payload));
-    child.stdin.end();
+    child.stdin.on("error", () => { /* hook exited before reading its payload */ });
+    try {
+      child.stdin.write(JSON.stringify(payload));
+      child.stdin.end();
+    } catch {
+      // The close handler reports the hook outcome.
+    }
   });
 }
 

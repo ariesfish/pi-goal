@@ -19,9 +19,14 @@ export function renderDashboardLines(
   width: number,
   th: Theme,
   maxRows: number = 6,
-  headerHints: string[] = []
+  headerHints: string[] = [],
+  phase?: string
 ): string[] {
   const lines: string[] = [];
+
+  if (phase) {
+    lines.push(`  ${th.fg("muted", "Phase:")} ${th.fg("accent", phase)}`);
+  }
 
   if (st.results.length === 0) {
     lines.push(`  ${th.fg("dim", "No runs yet.")}`);

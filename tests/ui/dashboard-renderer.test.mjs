@@ -35,3 +35,13 @@ test("dashboard full mode renders runs older than the default summary recent lim
   assert.match(lines, /run-1/);
   assert.match(lines, /run-75/);
 });
+
+test("dashboard shows the phase even before the first run", () => {
+  const state = createResearchState();
+  state.name = "Cold start";
+
+  const lines = renderDashboardLines(state, 80, plainTheme, 0, [], "probing").join("\n");
+
+  assert.match(lines, /Phase: probing/);
+  assert.match(lines, /No runs yet/);
+});

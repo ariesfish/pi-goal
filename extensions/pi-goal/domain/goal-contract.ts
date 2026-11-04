@@ -299,3 +299,17 @@ export function isLegacyMetricContract(contract: GoalContract): boolean {
     contract.criteria[0].kind === "metric"
   );
 }
+
+export function blockingCriteriaProgress(
+  contract: GoalContract | null,
+  gate: GateResult | null,
+): { passed: number; total: number } {
+  if (!contract) return { passed: 0, total: 0 };
+  const blocking = new Set(
+    contract.criteria.filter((criterion) => criterion.blocking).map((criterion) => criterion.id),
+  );
+  const passed = gate
+    ? gate.criteria.filter((verdict) => verdict.blocking && verdict.pass && blocking.has(verdict.criterionId)).length
+    : 0;
+  return { passed, total: blocking.size };
+}

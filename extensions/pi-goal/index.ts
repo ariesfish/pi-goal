@@ -327,12 +327,8 @@ export default function goalExtension(pi: ExtensionAPI) {
       handler: async (ctx) => {
         const runtime = getRuntime(ctx);
         const state = runtime.state;
-        if (state.results.length === 0) {
-          if (!runtime.loop.mode && !readResearchFileContract(resolveWorkDir(ctx.cwd)).hasRules) {
-            ctx.ui.notify("No runs yet — run /goal to get started", "info");
-          } else {
-            ctx.ui.notify("No runs yet", "info");
-          }
+        if (state.results.length === 0 && !runtime.loop.mode) {
+          ctx.ui.notify("No runs yet — run /goal to get started", "info");
           return;
         }
         runtime.dashboardExpanded = !runtime.dashboardExpanded;
@@ -351,7 +347,7 @@ export default function goalExtension(pi: ExtensionAPI) {
       handler: async (ctx) => {
         const runtime = getRuntime(ctx);
         const state = runtime.state;
-        if (state.results.length === 0) {
+        if (state.results.length === 0 && !runtime.loop.mode) {
           ctx.ui.notify("No runs yet", "info");
           return;
         }

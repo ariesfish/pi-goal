@@ -11,6 +11,7 @@ import {
 import { formatMetricValue } from "./metric-format.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { buildResearchSummaryFromState, isBetterMetric } from "../domain/research-summary.ts";
+import { blockingCriteriaProgress } from "../domain/goal-contract.ts";
 
 export interface WidgetController {
   update(ctx: ExtensionContext, runtime: SessionRuntime): void;
@@ -32,7 +33,7 @@ export function createWidgetController(options: {
     const state = runtime.state;
 
     if (state.results.length === 0) {
-      if (!runtime.activeRun) {
+      if (!runtime.activeRun && !runtime.loop.mode) {
         ctx.ui.setWidget("goal", undefined);
         return;
       }
@@ -40,17 +41,24 @@ export function createWidgetController(options: {
       ctx.ui.setWidget("goal", (tui, theme) => ({
         render(width: number): string[] {
           const safeWidth = Math.max(1, width || getTuiSize(tui).width);
-          const runningLine = joinPartsToWidth(
-            [
-              theme.fg("accent", "🎯"),
-              theme.fg("warning", " running…"),
-              state.name ? theme.fg("dim", ` │ ${state.name}`) : "",
-              theme.fg("dim", ` │ ${runtime.activeRun?.command ?? ""}`),
-              theme.fg("dim", " │ waiting for first logged result"),
-            ],
-            safeWidth
-          );
-          return [runningLine];
+          const closed = state.directions.filter(
+            (direction) => direction.status === "kept" || direction.status === "killed",
+          ).length;
+          const parts = [
+            theme.fg("accent", "🎯"),
+            theme.fg("muted", ` ${runtime.loop.phase}`),
+            state.directions.length > 0
+              ? theme.fg("muted", ` │ ${closed}/${state.directions.length} directions`)
+              : "",
+            state.probes.length > 0 ? theme.fg("muted", ` │ ${state.probes.length} probes`) : "",
+            state.contract
+              ? theme.fg("success", " │ contract frozen")
+              : theme.fg("dim", " │ contract not frozen"),
+            runtime.activeRun
+              ? theme.fg("warning", ` │ running: ${runtime.activeRun.command}`)
+              : "",
+          ];
+          return [joinPartsToWidth(parts, safeWidth)];
         },
         invalidate(): void {},
       }));
@@ -82,7 +90,8 @@ export function createWidgetController(options: {
               safeWidth,
               theme,
               rows,
-              options.dashboardHintVariants("collapse")
+              options.dashboardHintVariants("collapse"),
+              runtime.loop.phase
             ),
           ];
         },
@@ -100,11 +109,7 @@ export function createWidgetController(options: {
           const baseline = summary.currentExperiment.baseline;
           const best = summary.currentExperiment.best;
           const displayVal = best?.metric ?? baseline?.metric ?? null;
-          const blockingTotal = state.contract?.criteria.filter((criterion) => criterion.blocking).length ?? 0;
-          const lastGate = state.gates.at(-1);
-          const blockingPassed = lastGate
-            ? lastGate.criteria.filter((verdict) => verdict.blocking && verdict.pass).length
-            : 0;
+          const progress = blockingCriteriaProgress(state.contract, state.gates.at(-1) ?? null);
           const essential = [
             theme.fg("accent", "🎯"),
             theme.fg("muted", ` ${runtime.loop.phase}`),
@@ -116,8 +121,8 @@ export function createWidgetController(options: {
               theme.bold(`★ ${state.metricName}: ${formatMetricValue(displayVal, state.metricUnit)}`)
             ),
             best ? theme.fg("dim", ` #${best.runNumber}`) : "",
-            blockingTotal > 0
-              ? theme.fg("dim", ` │ ${blockingPassed}/${blockingTotal} criteria`)
+            progress.total > 0
+              ? theme.fg("dim", ` │ ${progress.passed}/${progress.total} criteria`)
               : "",
           ];
 

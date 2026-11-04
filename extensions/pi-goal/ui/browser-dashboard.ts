@@ -79,17 +79,23 @@ export function createDashboardServer(): DashboardServerController {
   }
 
   function openInBrowser(url: string): void {
+    const launch = (command: string, args: string[], options: Record<string, unknown>) => {
+      const child = spawn(command, args, options);
+      child.on("error", () => { /* no browser opener; the URL is still in the notification */ });
+      child.unref();
+    };
+
     if (process.platform === "win32") {
-      spawn("cmd", ["/c", "start", "", url], {
+      launch("cmd", ["/c", "start", "", url], {
         detached: true,
         shell: true,
         stdio: "ignore",
-      }).unref();
+      });
       return;
     }
 
     const openCmd = process.platform === "darwin" ? "open" : "xdg-open";
-    spawn(openCmd, [url], { detached: true, stdio: "ignore" }).unref();
+    launch(openCmd, [url], { detached: true, stdio: "ignore" });
   }
 
   function stop(): void {

@@ -45,7 +45,7 @@ export function createDashboardOverlayController(): DashboardOverlayController {
       }, 80);
 
       const buildOverlayContent = (renderWidth: number): string[] => {
-        const content = renderDashboardLines(state, renderWidth, theme, 0);
+        const content = renderDashboardLines(state, renderWidth, theme, 0, [], runtime.loop.phase);
         if (runtime.activeRun) {
           const elapsed = formatElapsed(Date.now() - runtime.activeRun.startedAt);
           const frame = SPINNER[spinnerFrame % SPINNER.length];

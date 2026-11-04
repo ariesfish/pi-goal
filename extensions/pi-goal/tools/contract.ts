@@ -138,6 +138,11 @@ export function registerGoalContractTools(pi: ExtensionAPI, deps: GoalContractTo
       const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
       if (!contextResult.ok) return textToolResult(contextResult.text);
       const { runtime, workDir } = contextResult.context;
+      if (!ctx.hasUI) {
+        return textToolResult(
+          "❌ freeze_criteria needs one human confirmation. Run pi interactively, freeze the contract, then hand off the sealed loop.",
+        );
+      }
       const result = await executeFreezeCriteria(params, {
         runtime,
         workDir,
