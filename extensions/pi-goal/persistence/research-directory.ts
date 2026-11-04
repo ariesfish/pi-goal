@@ -15,6 +15,7 @@ export interface ResearchPaths {
   ideas: string;
   checks: string;
   script: string;
+  attempts: string;
 }
 
 export interface ActiveResearch {
@@ -83,6 +84,7 @@ function researchFor(projectDir: string, researchId: string): ActiveResearch {
       ideas: path.join(directory, "goal.ideas.md"),
       checks: path.join(directory, "goal.checks.sh"),
       script: path.join(directory, "goal.sh"),
+      attempts: path.join(directory, "attempts"),
     },
   };
 }

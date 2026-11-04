@@ -35,6 +35,10 @@ import {
   sealResearchContract,
 } from "../protocol/research-phase.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
+import {
+  checkResearchWorkspace,
+  formatWorkspaceSafetyError,
+} from "../workspace/research-workspace.ts";
 
 export interface DirectionCardInput {
   id: string;
@@ -84,6 +88,7 @@ export interface FreezeCriteriaParams {
   objective: string;
   criteria: FreezeCriterionInput[];
   test_globs?: string[];
+  scope_globs?: string[];
   allow_test_edits?: boolean;
 }
 
@@ -91,6 +96,7 @@ export interface GoalWorkflowDeps {
   runtime: SessionRuntime;
   workDir: string;
   confirm(message: string): Promise<boolean>;
+  exec?: { exec(command: string, args: string[], options: { cwd?: string; timeout?: number }): Promise<{ code: number | null; stdout: string; stderr: string }> };
   broadcastDashboardUpdate?(workDir: string): void;
 }
 
@@ -261,6 +267,11 @@ export async function executeFreezeCriteria(
   if (phase !== "converging" && phase !== "framing" && phase !== "needs_init") {
     return blocked(`freeze_criteria runs after converging. Current phase: ${phase}.`);
   }
+  if (deps.exec) {
+    const workspace = await checkResearchWorkspace(deps.exec, workDir);
+    const dirty = formatWorkspaceSafetyError(workspace);
+    if (dirty) return blocked(dirty);
+  }
   if (!params.objective?.trim()) return blocked("freeze_criteria needs an objective.");
   if (!Array.isArray(params.criteria) || params.criteria.length === 0) {
     return blocked("freeze_criteria needs at least one criterion.");
@@ -272,6 +283,7 @@ export async function executeFreezeCriteria(
     objective: params.objective.trim(),
     criteria,
     testGlobs: params.test_globs ?? [],
+    scopeGlobs: params.scope_globs ?? [],
     allowTestEdits: params.allow_test_edits === true,
     frozenAt: Date.now(),
   };

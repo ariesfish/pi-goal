@@ -21,6 +21,7 @@ import {
 } from "../workflows/goal-contract-workflow.ts";
 
 export interface GoalContractToolDeps {
+  exec: Pick<ExtensionAPI, "exec">;
   getRuntime(ctx: ExtensionContext): SessionRuntime;
   updateWidget(ctx: ExtensionContext): void;
   broadcastDashboardUpdate(workDir: string): void;
@@ -141,6 +142,7 @@ export function registerGoalContractTools(pi: ExtensionAPI, deps: GoalContractTo
         runtime,
         workDir,
         confirm: (message) => ctx.ui.confirm("Freeze goal contract", message),
+        exec: deps.exec,
         broadcastDashboardUpdate: deps.broadcastDashboardUpdate,
       });
       return finish(ctx, workDir, result);

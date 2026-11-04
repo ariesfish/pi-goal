@@ -57,6 +57,7 @@ import {
 import { restoreActiveResearchRuntime } from "./support/research-runtime-restore.ts";
 import { registerGoalCommand } from "./tools/goal-command.ts";
 import { registerGoalContractTools } from "./tools/contract.ts";
+import { registerCheckGoalTool } from "./tools/check.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -248,9 +249,18 @@ export default function goalExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   registerGoalContractTools(pi, {
+    exec: pi,
     getRuntime,
     updateWidget,
     broadcastDashboardUpdate,
+  });
+
+  registerCheckGoalTool(pi, {
+    exec: pi,
+    getRuntime,
+    updateWidget,
+    broadcastDashboardUpdate,
+    readLastRun,
   });
 
   // -----------------------------------------------------------------------

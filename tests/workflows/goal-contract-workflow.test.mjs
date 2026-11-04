@@ -260,3 +260,28 @@ test("freeze_criteria seals directly when a baseline already exists", async () =
     assert.equal(runtime.loop.phase, "sealed");
   });
 });
+
+test("freeze_criteria refuses a dirty tree before asking", async () => {
+  await withTempResearch("freeze-dirty", async (workDir) => {
+    const runtime = setup();
+    let asked = false;
+    const result = await executeFreezeCriteria(
+      { objective: "cut test time", criteria },
+      {
+        runtime,
+        workDir,
+        confirm: async () => { asked = true; return true; },
+        exec: {
+          async exec() {
+            return { code: 0, stdout: " M src/app.ts\n", stderr: "" };
+          },
+        },
+      },
+    );
+
+    assert.equal(result.ok, false);
+    assert.equal(asked, false);
+    assert.match(result.text, /pre-existing non-research changes/);
+    assert.deepEqual(readEntries(workDir), []);
+  });
+});

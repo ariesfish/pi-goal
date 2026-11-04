@@ -20,9 +20,18 @@ import {
   restoreRejectedRunResultTransaction,
 } from "../workspace/run-result-transaction.ts";
 import {
+  appendJournalEntry,
   appendRunResultToJournal,
   runResultJournalEntry,
 } from "../persistence/research-journal.ts";
+import {
+  formatGateFailure,
+  formatGateSummary,
+  gateJournalEntry,
+  runGate,
+} from "../execution/gate-runner.ts";
+import { checkResearchWorkspace } from "../workspace/research-workspace.ts";
+import { activeResearch } from "../persistence/research-directory.ts";
 
 export interface RecordRunResultDeps {
   pi: WorkspaceExecAdapter;
@@ -68,8 +77,36 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
   });
   if (validationError) return { ok: false, text: validationError };
 
+  let gateSummary = "";
+  let gateCriteriaIds: string[] | undefined;
+  let gateHash: string | undefined;
+  if (state.contract && params.status === "keep") {
+    const workspace = await checkResearchWorkspace(deps.pi, deps.workDir);
+    if (workspace.error) {
+      return { ok: false, text: `❌ Gate could not read the workspace: ${workspace.error}` };
+    }
+    const gate = await runGate({
+      pi: deps.pi,
+      workDir: deps.workDir,
+      contract: state.contract,
+      state,
+      metric: params.metric,
+      changedPaths: workspace.userPaths,
+      forceKeep: params.force_keep === true,
+    });
+    const gateError = appendJournalEntry(deps.workDir, gateJournalEntry(gate));
+    if (gateError) return { ok: false, text: gateError };
+    if (gate.verdict === "fail") return { ok: false, text: formatGateFailure(gate) };
+    gateSummary = formatGateSummary(gate);
+    gateCriteriaIds = gate.criteria
+      .filter((verdict) => verdict.blocking && verdict.pass)
+      .map((verdict) => verdict.criterionId);
+    gateHash = gate.contractHash;
+  }
+
   const prepared = prepareRunResult(state, params);
   let text = formatLogSummary({ state: prepared.state, applied: prepared.applied, params });
+  if (gateSummary) text = `${gateSummary}\n${text}`;
 
   const keepResult = await applyKeptRunResultTransaction({
     pi: deps.pi,
@@ -79,6 +116,8 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
     metric: params.metric,
     status: params.status,
     secondaryMetrics: prepared.applied.secondaryMetrics,
+    criteriaIds: gateCriteriaIds,
+    gateHash,
   });
   text += keepResult.text;
   if (keepResult.commit) prepared.applied.runResult.commit = keepResult.commit;
@@ -92,11 +131,22 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
   commitPreparedRunResult(state, prepared.state);
   deps.broadcastDashboardUpdate(deps.workDir);
 
-  text += await restoreRejectedRunResultTransaction({
+  const restored = await restoreRejectedRunResultTransaction({
     pi: deps.pi,
     workDir: deps.workDir,
-    status: params.status,
+    status: params.status as "discard" | "crash" | "checks_failed",
+    runNumber: prepared.applied.runCount,
+    description: params.description,
+    attemptsDir: activeResearch(deps.workDir).paths.attempts,
   });
+  text += restored.text;
+  if (restored.attempt) {
+    const attemptError = appendJournalEntry(deps.workDir, {
+      type: "attempt",
+      attempt: restored.attempt,
+    });
+    if (attemptError) text += `\n${attemptError}`;
+  }
 
   const afterSteer = await deps.fireHook({
     event: "after",

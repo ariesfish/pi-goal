@@ -1,6 +1,7 @@
 import {
   commitKeptRunResult,
   restoreRejectedRunResult,
+  type RestoreRejectedRunResult,
   type WorkspaceExecAdapter,
 } from "./research-workspace.ts";
 
@@ -12,11 +13,22 @@ export interface RunWorkspaceTransactionOptions {
   metric: number;
   status: "keep" | "discard" | "crash" | "checks_failed";
   secondaryMetrics: Record<string, number>;
+  criteriaIds?: string[];
+  gateHash?: string;
 }
 
 export interface RunWorkspaceTransactionResult {
   text: string;
   commit: string | null;
+}
+
+export interface RestoreRejectedRunOptions {
+  pi: WorkspaceExecAdapter;
+  workDir: string;
+  status: "discard" | "crash" | "checks_failed";
+  runNumber: number;
+  description: string;
+  attemptsDir: string;
 }
 
 export async function applyKeptRunResultTransaction(
@@ -31,12 +43,13 @@ export async function applyKeptRunResultTransaction(
     metric: options.metric,
     status: options.status,
     secondaryMetrics: options.secondaryMetrics,
+    criteriaIds: options.criteriaIds,
+    gateHash: options.gateHash,
   });
 }
 
 export async function restoreRejectedRunResultTransaction(
-  options: Pick<RunWorkspaceTransactionOptions, "pi" | "workDir" | "status">,
-): Promise<string> {
-  if (options.status === "keep") return "";
-  return restoreRejectedRunResult({ pi: options.pi, workDir: options.workDir, status: options.status });
+  options: RestoreRejectedRunOptions,
+): Promise<RestoreRejectedRunResult> {
+  return restoreRejectedRunResult(options);
 }

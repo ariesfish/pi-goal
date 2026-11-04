@@ -120,7 +120,10 @@ test("run logging journals and restores a rejected Run Result while preserving A
     assert.equal(result.ok, true);
     assert.equal(state.results.length, 1);
     assert.equal(deps._calls.some(([command, args]) => command === "bash" && args[0] === "-c"), true);
-    assert.equal(deps._calls.some(([command]) => command === "git"), false);
+    assert.equal(
+      deps._calls.some(([command, args]) => command === "git" && args[0] !== "rev-parse"),
+      false,
+    );
     const lines = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n");
     assert.equal(lines.length, 2);
     const entry = JSON.parse(lines[1]);

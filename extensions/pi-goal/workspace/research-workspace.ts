@@ -1,6 +1,8 @@
+import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { isResearchStatePath } from "../persistence/research-directory.ts";
+import type { Attempt } from "../domain/goal-contract.ts";
 
 export interface WorkspaceExecAdapter {
   exec(command: string, args: string[], options: { cwd?: string; timeout?: number }): Promise<{
@@ -26,6 +28,8 @@ export interface CommitKeptRunResultOptions {
   metric: number;
   status: string;
   secondaryMetrics: Record<string, number>;
+  criteriaIds?: string[];
+  gateHash?: string;
 }
 
 export interface CommitKeptRunResult {
@@ -94,7 +98,12 @@ export async function commitKeptRunResult(
       ...options.secondaryMetrics,
     };
     const trailerJson = JSON.stringify(resultData);
-    const commitMsg = `${options.description}\n\nResult: ${trailerJson}`;
+    const trailers = [`Result: ${trailerJson}`];
+    if (options.gateHash) trailers.push(`Gate: ${options.gateHash}`);
+    if (options.criteriaIds && options.criteriaIds.length > 0) {
+      trailers.push(`Criteria: ${options.criteriaIds.join(",")}`);
+    }
+    const commitMsg = `${options.description}\n\n${trailers.join("\n")}`;
 
     const execOpts = { cwd: options.workDir, timeout: 10000 };
     const addResult = await options.pi.exec("git", ["add", "-A"], execOpts);
@@ -133,21 +142,67 @@ export async function commitKeptRunResult(
   return { text, commit };
 }
 
+export interface RestoreRejectedRunResult {
+  text: string;
+  attempt: Attempt | null;
+}
+
 export async function restoreRejectedRunResult(options: {
   pi: WorkspaceExecAdapter;
   workDir: string;
-  status: string;
-}): Promise<string> {
+  status: "discard" | "crash" | "checks_failed";
+  runNumber: number;
+  description: string;
+  attemptsDir: string;
+}): Promise<RestoreRejectedRunResult> {
+  const checkpoint = await readCheckpoint(options.pi, options.workDir);
+  const patchPath = path.join(options.attemptsDir, `${options.runNumber}.patch`);
   try {
+    fs.mkdirSync(options.attemptsDir, { recursive: true });
     const revertScript = `
-            git checkout -- . ':(exclude,glob)**/.goal/**' ':(exclude,glob)**/goal.*' ':(exclude,glob)**/goal.*/**'
-            git clean -fd -e '.goal' -e '.goal/**' -e 'goal.*' -e '**/goal.*/**' 2>/dev/null
+            git add -A -- . ':(exclude,glob)**/.goal/**' ':(exclude,glob)**/goal.*' ':(exclude,glob)**/goal.hooks/**' 2>/dev/null || true
+            git diff --cached --binary > ${shellQuote(patchPath)}
+            git reset --hard HEAD
+            git clean -fd -e '.goal' -e '**/.goal/**' -e 'goal.*' -e '**/goal.*/**' -e 'goal.hooks' -e '**/goal.hooks/**' 2>/dev/null || true
           `;
-    await options.pi.exec("bash", ["-c", revertScript], { cwd: options.workDir, timeout: 10000 });
-    return `\n📝 Git: reverted changes (${options.status}) — goal files preserved`;
+    const result = await options.pi.exec("bash", ["-c", revertScript], { cwd: options.workDir, timeout: 15000 });
+    if (result.code !== 0) {
+      throw new Error((result.stdout + result.stderr).trim().slice(0, 300) || `exit ${result.code}`);
+    }
+    const attempt: Attempt = {
+      run: options.runNumber,
+      status: options.status,
+      checkpoint,
+      patchPath,
+      description: options.description,
+      at: Date.now(),
+    };
+    return {
+      text: `\n📝 Git: reverted changes (${options.status}) to ${checkpoint.slice(0, 7)} — attempt diff kept at ${patchPath}`,
+      attempt: fs.existsSync(patchPath) ? attempt : null,
+    };
   } catch (e) {
-    return `\n⚠️ Git revert failed: ${e instanceof Error ? e.message : String(e)}`;
+    return {
+      text: `\n⚠️ Git revert failed: ${e instanceof Error ? e.message : String(e)}`,
+      attempt: null,
+    };
   }
+}
+
+export async function readCheckpoint(
+  pi: WorkspaceExecAdapter,
+  workDir: string,
+): Promise<string> {
+  try {
+    const result = await pi.exec("git", ["rev-parse", "HEAD"], { cwd: workDir, timeout: 5000 });
+    return (result.stdout || "").trim() || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
 }
 
 function parsePorcelainPaths(output: string): string[] {
