@@ -148,20 +148,21 @@ Files live under `.goal/researches/<id>/`. For the default research, `goal.md`, 
 
 ## Reviewer (optional)
 
-Add a reviewer to `goal.config.json`:
+The default reviewer is a **pi subagent** with its own model. Add it to `goal.config.json`:
 
 ```json
 {
   "reviewer": {
-    "command": "codex",
-    "args": ["exec", "--json"],
-    "timeoutSeconds": 180,
+    "kind": "pi",
+    "model": "openai/gpt-5.5",
+    "thinking": "high",
+    "timeoutSeconds": 300,
     "blocking": false
   }
 }
 ```
 
-The reviewer receives JSON on stdin — diff, frozen criteria, changed paths, and the last gate — never the implementer's summary. It must return JSON findings:
+The subagent runs in an isolated temp directory containing only `payload.json` (diff, untracked files, frozen criteria, last gate, changed paths) with `--tools read --no-extensions --no-skills --no-context-files --no-mcp --no-session`. It cannot edit, run bash, or see the implementer's summary. It must return JSON findings:
 
 ```json
 {
@@ -176,7 +177,23 @@ The reviewer receives JSON on stdin — diff, frozen criteria, changed paths, an
 }
 ```
 
-The extension runs every `repro`. A finding without a repro, or whose repro passes, is advisory. With `blocking: true`, one reproduced blocking finding denies the keep. Precision (`reproduced / blocking`) is reported so you can decide whether the reviewer has earned blocking power.
+The extension runs every `repro` in the real project. A finding without a repro, or whose repro passes, is advisory. With `blocking: true`, one reproduced blocking finding denies the keep. Precision (`reproduced / blocking`) is reported so you can decide whether the reviewer has earned blocking power.
+
+External command reviewers remain available:
+
+```json
+{
+  "reviewer": {
+    "kind": "command",
+    "command": "node",
+    "args": ["tools/reviewer.mjs"],
+    "timeoutSeconds": 180,
+    "blocking": false
+  }
+}
+```
+
+A command reviewer receives the same payload as JSON on stdin and must return the same findings JSON.
 
 ---
 

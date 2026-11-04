@@ -38,6 +38,8 @@ import { runReview } from "./review-workflow.ts";
 export interface RecordRunResultDeps {
   pi: WorkspaceExecAdapter;
   workDir: string;
+  /** Where goal.config.json lives; defaults to workDir. */
+  configDir?: string;
   state: ResearchState;
   lastRunChecks: { pass: boolean; output: string; duration: number } | null;
   wallClockSeconds: number | null;
@@ -110,7 +112,7 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
   }
 
   if (state.contract && params.status === "keep") {
-    const reviewer = readReviewerConfig(deps.workDir);
+    const reviewer = readReviewerConfig(deps.configDir ?? deps.workDir);
     if (reviewer) {
       try {
         const workspace = await checkResearchWorkspace(deps.pi, deps.workDir);

@@ -4,8 +4,11 @@ import * as path from "node:path";
 import { researchConfigPath } from "./research-directory.ts";
 
 export interface ReviewerConfig {
-  command: string;
+  kind?: "pi" | "command";
+  command?: string;
   args?: string[];
+  model?: string;
+  thinking?: string;
   timeoutSeconds?: number;
   blocking?: boolean;
 }
@@ -68,13 +71,31 @@ export function readConfig(cwd: string): ConfigResult {
 
   if (parsed.reviewer !== undefined) {
     const reviewer = parsed.reviewer;
-    if (!isRecord(reviewer) || typeof reviewer.command !== "string" || reviewer.command.trim() === "") {
+    if (!isRecord(reviewer)) {
+      return {
+        ok: false,
+        config: {},
+        error: `Invalid goal.config.json at ${configPath}: reviewer must be an object.`,
+      };
+    }
+
+    const kind = reviewer.kind === "command" ? "command" : reviewer.kind === "pi" ? "pi" : reviewer.model ? "pi" : "command";
+    if (kind === "pi") {
+      if (typeof reviewer.model !== "string" || reviewer.model.trim() === "") {
+        return {
+          ok: false,
+          config: {},
+          error: `Invalid goal.config.json at ${configPath}: reviewer.model is required for kind "pi".`,
+        };
+      }
+    } else if (typeof reviewer.command !== "string" || reviewer.command.trim() === "") {
       return {
         ok: false,
         config: {},
         error: `Invalid goal.config.json at ${configPath}: reviewer.command must be a non-empty string.`,
       };
     }
+
     if (reviewer.args !== undefined && (!Array.isArray(reviewer.args) || !reviewer.args.every((arg) => typeof arg === "string"))) {
       return {
         ok: false,
@@ -89,9 +110,20 @@ export function readConfig(cwd: string): ConfigResult {
         error: `Invalid goal.config.json at ${configPath}: reviewer.timeoutSeconds must be a positive number.`,
       };
     }
+    if (reviewer.thinking !== undefined && typeof reviewer.thinking !== "string") {
+      return {
+        ok: false,
+        config: {},
+        error: `Invalid goal.config.json at ${configPath}: reviewer.thinking must be a string.`,
+      };
+    }
+
     config.reviewer = {
-      command: reviewer.command,
+      kind,
+      command: typeof reviewer.command === "string" ? reviewer.command : undefined,
       args: reviewer.args,
+      model: typeof reviewer.model === "string" ? reviewer.model : undefined,
+      thinking: reviewer.thinking,
       timeoutSeconds: reviewer.timeoutSeconds,
       blocking: reviewer.blocking === true,
     };

@@ -103,13 +103,13 @@ JSON config file that lives in the pi session's working directory (`ctx.cwd`). S
 
 - **`maxIterations`** (number) — maximum experiments before auto-stopping.
 - **`workingDir`** (string) — override the directory for all goal operations: file I/O (`goal.jsonl`, `goal.md`, `goal.sh`, `goal.checks.sh`, `goal.ideas.md`), command execution, and git operations. Supports absolute paths or relative paths (resolved against `ctx.cwd`). The config file itself always stays in `ctx.cwd`. Fails if the directory doesn't exist.
-- **`reviewer`** — optional blind reviewer. `command` is required; `args`, `timeoutSeconds`, and `blocking` are optional. The reviewer gets JSON on stdin (diff + criteria + gate) and must return `{ "findings": [...] }`. Each finding's `repro` is executed; `blocking: true` lets a reproduced blocking finding deny a keep.
+- **`reviewer`** — optional blind reviewer. Default `kind: "pi"` with a `model` (provider/id) and optional `thinking`; it runs as an isolated pi subagent with `--tools read` in a temp directory containing only `payload.json`. `kind: "command"` runs an external command with the payload on stdin. Both must return `{ "findings": [...] }`; each finding's `repro` is executed by the extension, and `blocking: true` lets a reproduced blocking finding deny a keep.
 
 ```json
 {
   "workingDir": "/path/to/project",
   "maxIterations": 50,
-  "reviewer": { "command": "codex", "args": ["exec", "--json"] }
+  "reviewer": { "kind": "pi", "model": "openai/gpt-5.5", "thinking": "high" }
 }
 ```
 

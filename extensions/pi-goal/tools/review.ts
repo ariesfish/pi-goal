@@ -37,15 +37,15 @@ export function registerReviewGoalTool(pi: ExtensionAPI, deps: ReviewGoalToolDep
     async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
       const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
       if (!contextResult.ok) return textToolResult(contextResult.text);
-      const { runtime, workDir } = contextResult.context;
+      const { runtime, workDir, ctxCwd } = contextResult.context;
       const contract = runtime.state.contract;
       if (!contract) {
         return textToolResult("❌ No frozen contract. Call freeze_criteria before review_goal.");
       }
-      const reviewer = readReviewerConfig(workDir);
+      const reviewer = readReviewerConfig(ctxCwd ?? workDir);
       if (!reviewer) {
         return textToolResult(
-          "❌ No reviewer configured. Add reviewer.command (and optional args/timeoutSeconds/blocking) to goal.config.json.",
+          "❌ No reviewer configured. Add reviewer.model (pi subagent) or reviewer.command (external command) to goal.config.json.",
         );
       }
 

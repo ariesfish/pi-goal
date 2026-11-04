@@ -56,11 +56,12 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
     const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
     if (!contextResult.ok) return textToolResult(contextResult.text);
 
-    const { runtime, workDir } = contextResult.context;
+    const { runtime, workDir, ctxCwd } = contextResult.context;
     const state = runtime.state;
     const result = await recordRunResult(params, {
       pi,
       workDir,
+      configDir: ctxCwd,
       state,
       lastRunChecks: runtime.lastRunChecks,
       wallClockSeconds: runtime.lastRunDuration,

@@ -35,3 +35,40 @@ test("resolveWorkDir resolves relative workingDir against context cwd", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("reviewer config accepts a pi model or an external command", () => {
+  const dir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-config-"));
+  try {
+    fs.writeFileSync(path.join(dir, "goal.config.json"), JSON.stringify({
+      reviewer: { model: "openai/gpt-5.5", thinking: "high", blocking: true },
+    }));
+    const piResult = readConfig(dir);
+    assert.equal(piResult.ok, true);
+    assert.equal(piResult.config.reviewer.kind, "pi");
+    assert.equal(piResult.config.reviewer.model, "openai/gpt-5.5");
+    assert.equal(piResult.config.reviewer.blocking, true);
+
+    fs.writeFileSync(path.join(dir, "goal.config.json"), JSON.stringify({
+      reviewer: { command: "node", args: ["reviewer.mjs"] },
+    }));
+    const commandResult = readConfig(dir);
+    assert.equal(commandResult.ok, true);
+    assert.equal(commandResult.config.reviewer.kind, "command");
+    assert.equal(commandResult.config.reviewer.command, "node");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("reviewer config requires a model for pi and a command for command", () => {
+  const dir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-config-"));
+  try {
+    fs.writeFileSync(path.join(dir, "goal.config.json"), JSON.stringify({ reviewer: { kind: "pi" } }));
+    assert.match(readConfig(dir).error, /reviewer\.model is required/);
+
+    fs.writeFileSync(path.join(dir, "goal.config.json"), JSON.stringify({ reviewer: { kind: "command" } }));
+    assert.match(readConfig(dir).error, /reviewer\.command must be/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
