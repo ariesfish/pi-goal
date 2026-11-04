@@ -5,6 +5,7 @@ import {
   type GoalContract,
 } from "../domain/goal-contract.ts";
 import { currentRuns, type ResearchState } from "../domain/research-state.ts";
+import { matchGlob } from "../support/glob.ts";
 
 export interface GateExecAdapter {
   exec(
@@ -25,11 +26,6 @@ export interface GateOptions {
   forceKeep?: boolean;
 }
 
-export function matchGlob(filePath: string, glob: string): boolean {
-  const normalizedPath = filePath.replace(/\\/g, "/").replace(/^\.\//, "");
-  const normalizedGlob = glob.replace(/\\/g, "/").replace(/^\.\//, "");
-  return globToRegExp(normalizedGlob).test(normalizedPath);
-}
 
 export async function runGate(options: GateOptions): Promise<GateResult> {
   const verdicts: CriterionVerdict[] = [];
@@ -276,29 +272,3 @@ function tail(output: string): string {
   return output.split("\n").slice(-5).join("\n").slice(-500);
 }
 
-function globToRegExp(glob: string): RegExp {
-  let result = "";
-  for (let index = 0; index < glob.length; index++) {
-    const char = glob[index];
-    if (char === "*") {
-      if (glob[index + 1] === "*") {
-        index++;
-        if (glob[index + 1] === "/") {
-          index++;
-          result += "(?:.*/)?";
-        } else {
-          result += ".*";
-        }
-      } else {
-        result += "[^/]*";
-      }
-      continue;
-    }
-    if (char === "?") {
-      result += "[^/]";
-      continue;
-    }
-    result += char.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-  }
-  return new RegExp(`^${result}$`);
-}

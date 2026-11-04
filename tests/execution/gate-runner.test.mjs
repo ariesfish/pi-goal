@@ -3,9 +3,9 @@ import test from "node:test";
 
 import {
   formatGateFailure,
-  matchGlob,
   runGate,
 } from "../../extensions/pi-goal/execution/gate-runner.ts";
+import { matchGlob } from "../../extensions/pi-goal/support/glob.ts";
 import { createResearchState } from "../../extensions/pi-goal/domain/research-state.ts";
 
 const baseContract = (overrides = {}) => ({
