@@ -5,6 +5,7 @@ export interface SealedGuardState {
   phase: string;
   contract: GoalContract | null;
   testEditsAllowed: boolean;
+  benchmarkEditsAllowed: boolean;
 }
 
 export interface ToolCallLike {
@@ -24,7 +25,10 @@ export function sealedToolCallBlock(
     const filePath = typeof event.input.path === "string" ? event.input.path : null;
     if (!filePath) return null;
     if (isExtensionState(filePath)) {
-      return "This path is extension-managed research state. The journal and frozen contract are written by the extension, not edited directly.";
+      return "This path is extension-managed research state. The journal, attempts, contract, and active pointer are written by the extension, not edited directly.";
+    }
+    if (!state.benchmarkEditsAllowed && isBenchmarkFile(filePath)) {
+      return "goal.sh and goal.checks.sh are protected in the sealed phase. Ask the human to run /goal allow-benchmark if the benchmark itself must change.";
     }
     if (isProtectedTest(filePath, state)) {
       return "Test files are protected in the sealed phase. Change the code, or ask the human to run /goal allow-tests for this research.";
@@ -51,9 +55,22 @@ export function isProtectedTest(filePath: string, state: SealedGuardState): bool
 function isExtensionState(filePath: string): boolean {
   const normalized = filePath.replace(/\\/g, "/");
   return (
-    normalized.includes("/.goal/") ||
-    normalized.startsWith(".goal/") ||
     normalized.endsWith("goal.jsonl") ||
-    normalized.endsWith("goal.config.json")
+    normalized.endsWith("goal.config.json") ||
+    normalized.endsWith("/active") ||
+    normalized.includes("/.goal/active") ||
+    normalized.startsWith(".goal/active") ||
+    normalized.includes("/attempts/") ||
+    normalized.includes("/.goal/attempts/")
+  );
+}
+
+function isBenchmarkFile(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, "/");
+  return (
+    normalized === "goal.sh" ||
+    normalized.endsWith("/goal.sh") ||
+    normalized === "goal.checks.sh" ||
+    normalized.endsWith("/goal.checks.sh")
   );
 }

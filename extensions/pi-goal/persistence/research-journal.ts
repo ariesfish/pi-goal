@@ -118,6 +118,9 @@ export function probeJournalEntry(probe: ProbeRecord): Record<string, unknown> {
   return { type: "probe", probe };
 }
 
-export function policyJournalEntry(allowTestEdits: boolean): Record<string, unknown> {
-  return { type: "policy", policy: { allowTestEdits, at: Date.now() } };
+export function policyJournalEntry(
+  allowTestEdits: boolean,
+  allowBenchmarkEdits = false,
+): Record<string, unknown> {
+  return { type: "policy", policy: { allowTestEdits, allowBenchmarkEdits, at: Date.now() } };
 }

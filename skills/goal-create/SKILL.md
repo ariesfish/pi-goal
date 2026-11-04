@@ -32,6 +32,7 @@ Autonomous experiment loop: try ideas, keep what works, discard what doesn't, ne
 - `command` / `test` — an executable check with `exit0`, `stdout_contains`, or `stdout_regex`.
 - `manual` — advisory only; a manual criterion cannot block.
 - `test_globs` — protected test files; the sealed phase blocks edits unless the human runs `/goal allow-tests`.
+- `goal.sh` / `goal.checks.sh` — protected in the sealed phase; the human can run `/goal allow-benchmark` when the benchmark itself must change.
 - `scope_globs` — changed paths outside these globs fail the gate.
 
 A failed gate means `log_goal` with `status: keep` is rejected. Log the attempt as `discard` with the failure in `asi`; the code is reverted and the diff is kept under `.goal/researches/<id>/attempts/`.

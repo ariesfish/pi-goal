@@ -29,13 +29,35 @@ export function researchConfigPath(projectDir: string): string {
 }
 
 export function isResearchStatePath(filePath: string): boolean {
-  return filePath
-    .split(/[\\/]+/)
-    .some((part) => part === ".goal" || part === "goal.hooks" || part.startsWith("goal."));
+  const parts = filePath.split(/[\\/]+/).filter(Boolean);
+  if (parts[0] === ".goal" || parts[0] === "goal.hooks") return true;
+  return parts.length === 1 && parts[0].startsWith("goal.");
 }
 
 export function activeResearch(projectDir: string): ActiveResearch {
   return researchFor(projectDir, readActiveResearchId(projectDir));
+}
+
+const LEGACY_RESEARCH_FILES = {
+  rules: "goal.md",
+  script: "goal.sh",
+  checks: "goal.checks.sh",
+  ideas: "goal.ideas.md",
+} as const;
+
+/**
+ * Research files moved under .goal/researches/<id>/; the default research
+ * still accepts the legacy project-root files so existing sessions keep working.
+ */
+export function resolveResearchFilePath(
+  research: ActiveResearch,
+  kind: keyof typeof LEGACY_RESEARCH_FILES,
+): string {
+  const canonical = research.paths[kind];
+  if (fs.existsSync(canonical)) return canonical;
+  if (research.id !== DEFAULT_RESEARCH_ID) return canonical;
+  const legacy = path.join(research.projectDir, LEGACY_RESEARCH_FILES[kind]);
+  return fs.existsSync(legacy) ? legacy : canonical;
 }
 
 export function ensureActiveResearch(projectDir: string): ActiveResearch {

@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import type { ExperimentRunnerPiAdapter } from "./experiment-runner.ts";
+import { activeResearch, resolveResearchFilePath } from "../persistence/research-directory.ts";
 
 export interface ChecksRunResult {
   pass: boolean | null;
@@ -22,7 +23,7 @@ export async function runChecks(options: {
   let output = "";
   let durationSeconds = 0;
 
-  const checksPath = path.join(options.workDir, "goal.checks.sh");
+  const checksPath = resolveResearchFilePath(activeResearch(options.workDir), "checks");
   if (!options.benchmarkPassed || !fs.existsSync(checksPath)) {
     return { pass, timedOut, output, durationSeconds };
   }

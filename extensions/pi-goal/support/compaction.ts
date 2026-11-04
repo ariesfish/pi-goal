@@ -9,7 +9,10 @@
 
 import * as fs from "node:fs";
 import { researchStateFromJournal } from "../persistence/research-state-hydration.ts";
+import type { ResearchState } from "../domain/research-state.ts";
+import type { ResearchPhase } from "../protocol/research-phase.ts";
 import { activeResearch } from "../persistence/research-directory.ts";
+import { readResearchFileContract } from "../persistence/research-files.ts";
 import {
   buildResearchSummaryFromState,
   type ResearchSummary,
@@ -26,12 +29,12 @@ export interface ResearchSummaryPaths {
 }
 
 export function researchSummaryPathsFor(workDir: string): ResearchSummaryPaths {
-  const paths = activeResearch(workDir).paths;
+  const contract = readResearchFileContract(workDir);
   return {
     workDir,
-    jsonlPath: paths.journal,
-    mdPath: paths.rules,
-    ideasPath: paths.ideas,
+    jsonlPath: activeResearch(workDir).paths.journal,
+    mdPath: contract.rulesPath,
+    ideasPath: contract.ideasPath,
   };
 }
 
@@ -39,29 +42,100 @@ export function researchSummaryPathsFor(workDir: string): ResearchSummaryPaths {
  * Build the full compaction summary text from persisted research state.
  * Returns a markdown string that is itself the entire compaction summary.
  */
-export function buildResearchCompactionSummary(paths: ResearchSummaryPaths): string {
-  const model = loadSummary(paths.jsonlPath);
+export function buildResearchCompactionSummary(
+  paths: ResearchSummaryPaths,
+  phase: ResearchPhase = "sealed",
+): string {
+  const state = researchStateFromJournal(readFileOrEmpty(paths.jsonlPath));
+  const model = buildResearchSummaryFromState(state, { recentRunLimit: RECENT_RUN_LIMIT });
   const sections = [
     headerSection(),
+    phaseSection(phase),
+    contractSection(state),
+    directionsSection(state),
     researchSection(model),
+    gatesSection(state),
+    attemptsSection(state),
     rulesSection(paths.mdPath),
     ideasSection(paths.ideasPath),
     recentRunsSection(model),
-    nextStepSection(),
+    nextStepSection(phase),
   ];
   return sections.filter(Boolean).join("\n\n");
-}
-
-function loadSummary(jsonlPath: string): ResearchSummary {
-  return buildResearchSummaryFromState(
-    researchStateFromJournal(readFileOrEmpty(jsonlPath)),
-    { recentRunLimit: RECENT_RUN_LIMIT },
-  );
 }
 
 // ---------------------------------------------------------------------------
 // Sections
 // ---------------------------------------------------------------------------
+
+function phaseSection(phase: ResearchPhase): string {
+  return `## Phase\n\n${phase}`;
+}
+
+function contractSection(state: ResearchState): string {
+  const contract = state.contract;
+  if (!contract) {
+    return "## Goal Contract\n\nNot frozen yet. Frame directions and freeze criteria before running.";
+  }
+  const lines = [
+    "## Goal Contract",
+    "",
+    `Hash: ${contract.hash}`,
+    `Objective: ${contract.objective}`,
+    `Test protection: ${contract.testGlobs.length > 0 ? contract.testGlobs.join(", ") : "none"}`,
+    `Scope: ${contract.scopeGlobs.length > 0 ? contract.scopeGlobs.join(", ") : "unbounded"}`,
+    "",
+    ...contract.criteria.map((criterion) => {
+      const detail = criterion.check
+        ? ` check: ${criterion.check.command} (${criterion.check.expect})`
+        : criterion.metric
+          ? ` metric: ${criterion.metric.name} (${criterion.metric.direction})`
+          : "";
+      return `- ${criterion.id} [${criterion.kind}${criterion.blocking ? ", blocking" : ""}] ${criterion.statement}${detail}`;
+    }),
+  ];
+  return lines.join("\n");
+}
+
+function directionsSection(state: ResearchState): string {
+  if (state.directions.length === 0) return "";
+  return [
+    "## Directions",
+    "",
+    ...state.directions.map(
+      (direction) =>
+        `- ${direction.id} [${direction.status}] ${direction.title} (proxy: ${direction.proxyMetric})` +
+        (direction.evidence
+          ? ` evidence: ${direction.evidence.value ?? "—"} @ ${direction.evidence.outputHash.slice(0, 19)}`
+          : ""),
+    ),
+  ].join("\n");
+}
+
+function gatesSection(state: ResearchState): string {
+  const gate = state.gates.at(-1);
+  if (!gate) return "";
+  const failed = gate.criteria.filter((verdict) => !verdict.pass);
+  return [
+    "## Last Gate",
+    "",
+    `Verdict: ${gate.verdict} (${gate.contractHash})`,
+    ...failed.map((verdict) => `- failed: ${verdict.criterionId} — ${verdict.detail}`),
+  ].join("\n");
+}
+
+function attemptsSection(state: ResearchState): string {
+  if (state.attempts.length === 0) return "";
+  const recent = state.attempts.slice(-5);
+  return [
+    "## Reverted Attempts",
+    "",
+    ...recent.map(
+      (attempt) =>
+        `- #${attempt.run} ${attempt.status}: ${attempt.description} — patch: ${attempt.patchPath}`,
+    ),
+  ].join("\n");
+}
 
 function headerSection(): string {
   return [
@@ -142,13 +216,19 @@ function recentRunsSection(model: ResearchSummary): string {
   ].join("\n");
 }
 
-function nextStepSection(): string {
-  return [
-    "## Next Step",
-    "",
-    "Pick the most promising hypothesis (from the ideas backlog or the latest `next:` hints in recent runs)",
-    "and run the next measured run immediately. Do not stop until interrupted.",
-  ].join("\n");
+function nextStepSection(phase: ResearchPhase): string {
+  const actions: Record<ResearchPhase, string> = {
+    inactive: "Goal mode is off. Use /goal <text> to start.",
+    framing: "Call frame_goal with at least two orthogonal direction cards.",
+    probing: "Call probe_goal for every open direction; each probe ends kept or killed with evidence.",
+    converging: "Call freeze_criteria with one primary metric and an executable check for every blocking criterion.",
+    needs_init: "Call frame_goal to explore directions, or init_goal for a single clear metric.",
+    needs_baseline: "Run the baseline with run_goal, then call log_goal.",
+    awaiting_log: "Call log_goal for the previous run_goal result before anything else.",
+    sealed: "Pick the most promising hypothesis and run the next measured run with run_goal, then log_goal. Do not stop until interrupted.",
+    limit_reached: "The run limit is reached. Stop and report the best result.",
+  };
+  return ["## Next Step", "", actions[phase]].join("\n");
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 
-import { activeResearch } from "./research-directory.ts";
+import { activeResearch, resolveResearchFilePath } from "./research-directory.ts";
 import {
   hasResearchConfigHeader,
   parseResearchJournalModel,
@@ -38,12 +38,12 @@ export interface ResearchFileValidationResult {
 }
 
 export function readResearchFileContract(workDir: string): ResearchFileContract {
-  const paths = activeResearch(workDir).paths;
-  const rulesPath = paths.rules;
-  const scriptPath = paths.script;
-  const checksPath = paths.checks;
-  const ideasPath = paths.ideas;
-  const journalPath = paths.journal;
+  const research = activeResearch(workDir);
+  const rulesPath = resolveResearchFilePath(research, "rules");
+  const scriptPath = resolveResearchFilePath(research, "script");
+  const checksPath = resolveResearchFilePath(research, "checks");
+  const ideasPath = resolveResearchFilePath(research, "ideas");
+  const journalPath = research.paths.journal;
 
   const hasRules = fs.existsSync(rulesPath);
   const hasBenchmarkScript = fs.existsSync(scriptPath);

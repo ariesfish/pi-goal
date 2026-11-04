@@ -64,3 +64,30 @@ test("research file contract reports invalid benchmark script", () => {
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });
+
+test("the default research falls back to legacy project-root files", () => {
+  const projectDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-contract-"));
+  try {
+    fs.writeFileSync(path.join(projectDir, "goal.md"), "# Root goal\n");
+    fs.writeFileSync(path.join(projectDir, "goal.sh"), "#!/usr/bin/env bash\n");
+
+    const contract = readResearchFileContract(projectDir);
+
+    assert.equal(contract.hasRules, true);
+    assert.equal(contract.hasBenchmarkScript, true);
+    assert.equal(contract.rulesPath, path.join(projectDir, "goal.md"));
+    assert.equal(contract.scriptPath, path.join(projectDir, "goal.sh"));
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test("research state detection is limited to .goal and root goal files", async () => {
+  const { isResearchStatePath } = await import("../../extensions/pi-goal/persistence/research-directory.ts");
+
+  assert.equal(isResearchStatePath("src/goal.ts"), false);
+  assert.equal(isResearchStatePath("src/goal.test.ts"), false);
+  assert.equal(isResearchStatePath("goal.md"), true);
+  assert.equal(isResearchStatePath(".goal/researches/default/goal.jsonl"), true);
+  assert.equal(isResearchStatePath("nested/.goal/x"), false);
+});

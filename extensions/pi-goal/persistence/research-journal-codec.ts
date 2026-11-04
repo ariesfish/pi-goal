@@ -55,6 +55,7 @@ export interface ResearchJournalRun {
 export interface ResearchJournalModel extends GoalProtocolState {
   hasConfig: boolean;
   testEditsAllowed: boolean;
+  benchmarkEditsAllowed: boolean;
   name: string | null;
   metricName: string;
   metricUnit: string;
@@ -106,6 +107,7 @@ function reconstructedState(): ResearchJournalModel {
     ...emptyGoalProtocolState(),
     hasConfig: false,
     testEditsAllowed: false,
+    benchmarkEditsAllowed: false,
     name: null,
     metricName: DEFAULT_METRIC_NAME,
     metricUnit: DEFAULT_METRIC_UNIT,
@@ -458,6 +460,7 @@ export function parseResearchJournalModel(jsonlContent: string): ResearchJournal
 
     if (entry.type === "policy" && isObjectRecord(entry.policy)) {
       state.testEditsAllowed = entry.policy.allowTestEdits === true;
+      state.benchmarkEditsAllowed = entry.policy.allowBenchmarkEdits === true;
       continue;
     }
 

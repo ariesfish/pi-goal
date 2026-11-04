@@ -229,9 +229,10 @@ test("policy entries replay the test edit policy", () => {
   const allowed = researchStateFromJournal(journal([
     LEGACY_CONFIG,
     LEGACY_RUN,
-    { type: "policy", policy: { allowTestEdits: true, at: 5 } },
+    { type: "policy", policy: { allowTestEdits: true, allowBenchmarkEdits: true, at: 5 } },
   ]));
   assert.equal(allowed.testEditsAllowed, true);
+  assert.equal(allowed.benchmarkEditsAllowed, true);
 
   const restored = researchStateFromJournal(journal([
     LEGACY_CONFIG,
@@ -240,4 +241,5 @@ test("policy entries replay the test edit policy", () => {
     { type: "policy", policy: { allowTestEdits: false, at: 6 } },
   ]));
   assert.equal(restored.testEditsAllowed, false);
+  assert.equal(restored.benchmarkEditsAllowed, false);
 });

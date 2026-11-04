@@ -39,6 +39,8 @@ export interface ResearchState extends GoalProtocolState {
   confidence: number | null;
   /** Session policy: allow test edits even when the contract protects them. */
   testEditsAllowed: boolean;
+  /** Session policy: allow changes to goal.sh / goal.checks.sh in sealed mode. */
+  benchmarkEditsAllowed: boolean;
 }
 
 export function createResearchState(): ResearchState {
@@ -55,6 +57,7 @@ export function createResearchState(): ResearchState {
     runLimit: null,
     confidence: null,
     testEditsAllowed: false,
+    benchmarkEditsAllowed: false,
   };
 }
 
@@ -97,6 +100,7 @@ export function cloneResearchState(state: ResearchState): ResearchState {
     })),
     attempts: state.attempts.map((attempt) => ({ ...attempt })),
     testEditsAllowed: state.testEditsAllowed,
+    benchmarkEditsAllowed: state.benchmarkEditsAllowed,
   };
 }
 

@@ -66,6 +66,8 @@ It creates a goal branch, writes `goal.md` and `goal.sh`, then frames at least t
 | `/goal select <goal-id>` | Switch active research under `.goal/researches/` |
 | `/goal allow-tests` | Unlock test-file edits for this research |
 | `/goal protect-tests` | Restore the sealed test-file block |
+| `/goal allow-benchmark` | Unlock `goal.sh` / `goal.checks.sh` edits |
+| `/goal protect-benchmark` | Restore the benchmark-script block |
 | `/goal export` | Open the live browser dashboard |
 
 ### The loop
@@ -120,6 +122,7 @@ A legacy metric-only research hydrates a one-criterion contract and enters `need
 - **Criteria checks** — `exit0`, `stdout_contains`, or `stdout_regex` on a command; metric criteria compare against the experiment baseline.
 - **Noise gate** — an improvement below `1.0x` confidence needs `force_keep: true` plus a reason in `asi`.
 - **Test protection** — test files matching the contract's `test_globs` cannot change unless `allow_test_edits` is set or the human ran `/goal allow-tests`.
+- **Benchmark protection** — `goal.sh` and `goal.checks.sh` are read-only in sealed mode until the human runs `/goal allow-benchmark`.
 - **Scope** — with `scope_globs`, changed paths outside them fail the gate.
 - **Reviewer** — optional; a finding blocks only when its repro is executed and fails, and only with `reviewer.blocking: true`.
 
@@ -128,6 +131,8 @@ Kept commits carry `Gate:` and `Criteria:` trailers so the decision is auditable
 ---
 
 ## Files used by a loop
+
+Files live under `.goal/researches/<id>/`. For the default research, `goal.md`, `goal.sh`, `goal.checks.sh`, and `goal.ideas.md` also fall back to the project root, so single-research projects can keep them at the top level.
 
 | File | Purpose |
 |---|---|

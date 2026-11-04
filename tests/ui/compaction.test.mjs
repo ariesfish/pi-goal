@@ -162,3 +162,56 @@ test("delta is computed against the first run of the same experiment", () => {
     assert.match(summary, /#1 keep\s+200 \| desc: experiment0 base/);
   });
 });
+
+test("summary names the phase and its next action", () => {
+  withTempWorkDir((workDir) => {
+    const summary = buildResearchCompactionSummary(researchSummaryPathsFor(workDir), "probing");
+
+    assert.match(summary, /## Phase\s+probing/);
+    assert.match(summary, /Call probe_goal for every open direction/);
+    assert.match(summary, /Not frozen yet/);
+  });
+});
+
+test("summary includes the contract, directions, gate, and attempts", () => {
+  withTempWorkDir((workDir, researchDir) => {
+    writeJournalLines(researchDir, [
+      '{"type":"config","name":"Speed","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}',
+      '{"run":1,"commit":"aaa1111","metric":100,"status":"keep","description":"baseline","timestamp":1,"metrics":{}}',
+      JSON.stringify({
+        type: "contract",
+        contract: {
+          version: 1,
+          objective: "cut test time",
+          criteria: [{ id: "C1", statement: "faster", kind: "metric", blocking: true, metric: { name: "total_ms", direction: "lower" } }],
+          testGlobs: ["**/*.test.*"],
+          scopeGlobs: [],
+          allowTestEdits: false,
+          frozenAt: 1,
+          hash: "sha256:contract",
+        },
+      }),
+      JSON.stringify({
+        type: "direction",
+        direction: { id: "D1", title: "shared setup", mechanism: "one setup", proxyMetric: "total_ms", cost: "1d", risk: "leak", killIf: "order", status: "kept", evidence: { command: "run", value: 9000, outputHash: "sha256:probe", at: 2 } },
+      }),
+      JSON.stringify({
+        type: "gate",
+        gate: { verdict: "fail", contractHash: "sha256:contract", checkedAt: 3, criteria: [{ criterionId: "C1", pass: false, blocking: true, detail: "did not improve" }] },
+      }),
+      JSON.stringify({
+        type: "attempt",
+        attempt: { run: 2, status: "discard", checkpoint: "aaa1111", patchPath: ".goal/researches/default/attempts/2.patch", description: "try workers", at: 4 },
+      }),
+    ]);
+
+    const summary = buildResearchCompactionSummary(researchSummaryPathsFor(workDir), "sealed");
+
+    assert.match(summary, /Hash: sha256:contract/);
+    assert.match(summary, /C1 \[metric, blocking\] faster/);
+    assert.match(summary, /D1 \[kept\] shared setup/);
+    assert.match(summary, /Verdict: fail/);
+    assert.match(summary, /failed: C1/);
+    assert.match(summary, /#2 discard: try workers/);
+  });
+});

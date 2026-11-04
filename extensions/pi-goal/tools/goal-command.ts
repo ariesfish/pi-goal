@@ -59,6 +59,11 @@ async function handleGoalCommand(
     return;
   }
 
+  if (command === "allow-benchmark" || command === "protect-benchmark") {
+    toggleBenchmarkEdits(pi, ctx, deps, runtime, command === "allow-benchmark");
+    return;
+  }
+
   if (command === "export") {
     const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
     if (!contextResult.ok) {
@@ -94,7 +99,7 @@ async function handleGoalCommand(
 
 function goalCommandHelp(): string {
   return [
-    "Usage: /goal [off|clear|export|reinit|select <research-id>|allow-tests|protect-tests|<text>]",
+    "Usage: /goal [off|clear|export|reinit|select <research-id>|allow-tests|protect-tests|allow-benchmark|protect-benchmark|<text>]",
     "",
     "<text> enters goal mode and starts or resumes the loop.",
     "reinit starts a new experiment in the active research with a fresh baseline.",
@@ -103,6 +108,7 @@ function goalCommandHelp(): string {
     "clear deletes goal.jsonl and turns goal mode off.",
     "export opens a local live dashboard for goal.jsonl in your browser.",
     "allow-tests unlocks test-file edits for the sealed research; protect-tests restores the block.",
+    "allow-benchmark unlocks goal.sh / goal.checks.sh edits; protect-benchmark restores the block.",
     "",
     "Examples:",
     "  /goal optimize unit test runtime, monitor correctness",
@@ -181,7 +187,10 @@ function toggleTestEdits(
     return;
   }
   runtime.state.testEditsAllowed = allow;
-  const journalError = appendJournalEntry(contextResult.context.workDir, policyJournalEntry(allow));
+  const journalError = appendJournalEntry(
+    contextResult.context.workDir,
+    policyJournalEntry(allow, runtime.state.benchmarkEditsAllowed),
+  );
   if (journalError) {
     ctx.ui.notify(journalError, "error");
     return;
@@ -190,6 +199,39 @@ function toggleTestEdits(
     allow
       ? "Test edits allowed for this research. Gate L2 will not block test-file changes."
       : "Test protection restored for this research.",
+    "info",
+  );
+}
+
+function toggleBenchmarkEdits(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  deps: GoalCommandDeps,
+  runtime: SessionRuntime,
+  allow: boolean,
+): void {
+  if (!runtime.state.contract) {
+    ctx.ui.notify("No frozen contract yet — benchmark protection starts after freeze_criteria.", "info");
+    return;
+  }
+  const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
+  if (!contextResult.ok) {
+    ctx.ui.notify(contextResult.text.replace(/^❌\s*/, ""), "error");
+    return;
+  }
+  runtime.state.benchmarkEditsAllowed = allow;
+  const journalError = appendJournalEntry(
+    contextResult.context.workDir,
+    policyJournalEntry(runtime.state.testEditsAllowed, allow),
+  );
+  if (journalError) {
+    ctx.ui.notify(journalError, "error");
+    return;
+  }
+  ctx.ui.notify(
+    allow
+      ? "Benchmark edits allowed for this research. Seal protection for goal.sh / goal.checks.sh is off."
+      : "Benchmark protection restored for this research.",
     "info",
   );
 }

@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
+import { ensureActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 import {
   isGoalShCommand,
   parseMetricLines,
@@ -111,6 +112,35 @@ test("runExperiment records timed out checks as a failed Run", async () => {
     assert.equal(result.details.checksPass, false);
     assert.equal(result.details.checksTimedOut, true);
     assert.equal(result.details.parsedPrimary, 12);
+  } finally {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("runs checks from the research directory when present", async () => {
+  const workDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-checks-"));
+  try {
+    const researchDir = ensureActiveResearch(workDir).paths.directory;
+    const checksPath = path.join(researchDir, "goal.checks.sh");
+    fs.writeFileSync(checksPath, "#!/usr/bin/env bash\necho research-checks\n");
+    fs.chmodSync(checksPath, 0o755);
+
+    const calls = [];
+    await runExperiment({
+      command: "printf 'METRIC total_ms=10\\n'",
+      workDir,
+      metricName: "total_ms",
+      metricUnit: "ms",
+      pi: {
+        async exec(command, args) {
+          calls.push([command, args[0]]);
+          return { code: 0, killed: false, stdout: "", stderr: "" };
+        },
+      },
+      checksTimeoutSeconds: 5,
+    });
+
+    assert.equal(calls.some(([, script]) => script === checksPath), true);
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
   }

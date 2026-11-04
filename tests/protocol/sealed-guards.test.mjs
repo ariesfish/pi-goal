@@ -15,7 +15,7 @@ const contract = {
 };
 
 function state(overrides = {}) {
-  return { phase: "sealed", contract, testEditsAllowed: false, ...overrides };
+  return { phase: "sealed", contract, testEditsAllowed: false, benchmarkEditsAllowed: false, ...overrides };
 }
 
 test("guards only apply in the sealed phase with a contract", () => {
@@ -55,7 +55,7 @@ test("sealed mode allows normal source edits", () => {
   }), null);
 });
 
-test("sealed mode blocks research state edits", () => {
+test("sealed mode blocks research state edits but allows narrative files", () => {
   assert.match(
     sealedToolCallBlock(state(), { toolName: "write", input: { path: ".goal/researches/default/goal.jsonl" } }),
     /extension-managed/,
@@ -64,6 +64,27 @@ test("sealed mode blocks research state edits", () => {
     sealedToolCallBlock(state(), { toolName: "edit", input: { path: "goal.config.json" } }),
     /extension-managed/,
   );
+  assert.match(
+    sealedToolCallBlock(state(), { toolName: "write", input: { path: ".goal/researches/default/attempts/2.patch" } }),
+    /extension-managed/,
+  );
+  assert.equal(
+    sealedToolCallBlock(state(), { toolName: "edit", input: { path: ".goal/researches/default/goal.md" } }),
+    null,
+  );
+});
+
+test("sealed mode protects goal.sh and goal.checks.sh unless allowed", () => {
+  for (const path of ["goal.sh", "goal.checks.sh", ".goal/researches/default/goal.sh", ".goal/researches/default/goal.checks.sh"]) {
+    assert.match(
+      sealedToolCallBlock(state(), { toolName: "write", input: { path } }),
+      /protected in the sealed phase/,
+    );
+    assert.equal(
+      sealedToolCallBlock(state({ benchmarkEditsAllowed: true }), { toolName: "write", input: { path } }),
+      null,
+    );
+  }
 });
 
 test("sealed mode blocks git mutations but not read-only git", () => {

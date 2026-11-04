@@ -77,6 +77,7 @@ export function hydrateResearchStateFromJournalModel(state: ResearchState, model
   }));
   state.attempts = model.attempts.map((attempt) => ({ ...attempt }));
   state.testEditsAllowed = model.testEditsAllowed;
+  state.benchmarkEditsAllowed = model.benchmarkEditsAllowed;
 
   if (state.results.length === 0) return false;
   state.bestMetric = findBaselineMetric(state.results, state.currentExperimentIndex);

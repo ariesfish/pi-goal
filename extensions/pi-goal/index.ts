@@ -55,6 +55,7 @@ import { decideBoundaryContinuation } from "./protocol/boundary-resume.ts";
 import { markResearchAutoResumeSent } from "./protocol/research-phase.ts";
 import { sealedToolCallBlock } from "./protocol/sealed-guards.ts";
 import { restoreActiveResearchRuntime } from "./support/research-runtime-restore.ts";
+import { buildResearchCompactionSummary, researchSummaryPathsFor } from "./support/compaction.ts";
 import { registerGoalCommand } from "./tools/goal-command.ts";
 import { registerGoalContractTools } from "./tools/contract.ts";
 import { registerCheckGoalTool } from "./tools/check.ts";
@@ -148,6 +149,21 @@ export default function goalExtension(pi: ExtensionAPI) {
   pi.on("session_before_switch", async () => {
     dashboardOverlay.clear();
   });
+
+  pi.on("session_before_compact", async (event, ctx) => {
+    const runtime = getRuntime(ctx);
+    if (!runtime.loop.mode) return;
+    return {
+      compaction: {
+        summary: buildResearchCompactionSummary(
+          researchSummaryPathsFor(resolveWorkDir(ctx.cwd)),
+          runtime.loop.phase,
+        ),
+        firstKeptEntryId: event.preparation.firstKeptEntryId,
+        tokensBefore: event.preparation.tokensBefore,
+      },
+    };
+  });
   pi.on("session_shutdown", async (_e, ctx) => {
     clearSessionUi(ctx);
     cancelResearchResume(getRuntime(ctx));
@@ -174,6 +190,7 @@ export default function goalExtension(pi: ExtensionAPI) {
         phase: runtime.loop.phase,
         contract: runtime.state.contract,
         testEditsAllowed: runtime.state.testEditsAllowed,
+        benchmarkEditsAllowed: runtime.state.benchmarkEditsAllowed,
       },
       { toolName: event.toolName, input: event.input as Record<string, unknown> },
     );

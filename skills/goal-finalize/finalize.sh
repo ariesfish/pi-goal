@@ -44,6 +44,8 @@ fail() { cleanup_data; echo -e "${RED}ERROR: $1${NC}" >&2; exit 1; }
 
 is_session_file() {
   case "/$1/" in
+    */.goal/*) return 0;;
+    */.goal) return 0;;
     */goal.*/*) return 0;;
     *) return 1;;
   esac
@@ -60,22 +62,22 @@ parse_groups() {
   # Serialize JSON fields into flat files so bash can consume them without jq.
   # Node is already a dependency (used by the extension), so no new dep required.
   DATA_DIR=$(mktemp -d)
-  node -e "
-const fs = require('fs');
-const config = JSON.parse(fs.readFileSync('$groups_file', 'utf-8'));
-const outDir = '$DATA_DIR';
-fs.writeFileSync(outDir + '/base', config.base);
-fs.writeFileSync(outDir + '/trunk', config.trunk || 'main');
-fs.writeFileSync(outDir + '/final_tree', config.final_tree);
-fs.writeFileSync(outDir + '/goal', config.goal);
-fs.writeFileSync(outDir + '/count', String(config.groups.length));
+  GOAL_GROUPS_FILE="$groups_file" GOAL_DATA_DIR="$DATA_DIR" node -e '
+const fs = require("fs");
+const config = JSON.parse(fs.readFileSync(process.env.GOAL_GROUPS_FILE, "utf-8"));
+const outDir = process.env.GOAL_DATA_DIR;
+fs.writeFileSync(outDir + "/base", config.base);
+fs.writeFileSync(outDir + "/trunk", config.trunk || "main");
+fs.writeFileSync(outDir + "/final_tree", config.final_tree);
+fs.writeFileSync(outDir + "/goal", config.goal);
+fs.writeFileSync(outDir + "/count", String(config.groups.length));
 config.groups.forEach((group, idx) => {
-  fs.writeFileSync(outDir + '/' + idx + '.title', group.title);
-  fs.writeFileSync(outDir + '/' + idx + '.body', group.body);
-  fs.writeFileSync(outDir + '/' + idx + '.last_commit', group.last_commit);
-  fs.writeFileSync(outDir + '/' + idx + '.slug', group.slug);
+  fs.writeFileSync(outDir + "/" + idx + ".title", group.title);
+  fs.writeFileSync(outDir + "/" + idx + ".body", group.body);
+  fs.writeFileSync(outDir + "/" + idx + ".last_commit", group.last_commit);
+  fs.writeFileSync(outDir + "/" + idx + ".slug", group.slug);
 });
-" || fail "Failed to parse $groups_file — check JSON syntax."
+' || fail "Failed to parse $groups_file — check JSON syntax."
 
   BASE=$(cat "$DATA_DIR/base")
   TRUNK=$(cat "$DATA_DIR/trunk")
