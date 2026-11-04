@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import test from "node:test";
 
 import { createSessionRuntime } from "../../extensions/pi-goal/support/runtime.ts";
+import { legacyMetricContract } from "../../extensions/pi-goal/domain/goal-contract.ts";
 import { executeExperimentConfigWorkflow } from "../../extensions/pi-goal/workflows/research-workflow.ts";
 import { selectActiveResearch } from "../../extensions/pi-goal/persistence/research-directory.ts";
 import {
@@ -33,8 +34,8 @@ function deps(workDir, runtime, overrides = {}) {
         metric_name: state.metricName,
         metric_unit: state.metricUnit,
         direction: state.bestDirection,
-        baseline_metric: state.bestMetric,
-        best_metric: state.bestMetric,
+        baseline_metric: state.baselineMetric,
+        best_metric: state.baselineMetric,
         run_count: state.results.length,
         goal: state.name ?? "",
       };
@@ -113,7 +114,7 @@ test("experiment config workflow starts a later Experiment and resets comparison
     runtime.state.name = "Speed";
     runtime.state.metricName = "total_ms";
     runtime.state.metricUnit = "ms";
-    runtime.state.bestMetric = 10;
+    runtime.state.baselineMetric = 10;
     runtime.state.secondaryMetrics = [{ name: "compile_ms", unit: "ms" }];
     runtime.state.confidence = 2;
     runtime.state.results.push({
@@ -137,7 +138,7 @@ test("experiment config workflow starts a later Experiment and resets comparison
 
     assert.equal(result.ok, true);
     assert.equal(runtime.state.currentExperimentIndex, 1);
-    assert.equal(runtime.state.bestMetric, null);
+    assert.equal(runtime.state.baselineMetric, null);
     assert.deepEqual(runtime.state.secondaryMetrics, []);
     assert.equal(runtime.state.confidence, null);
     assert.match(result.text, /new experiment started/);
@@ -177,6 +178,30 @@ test("experiment config workflow rejects start_goal on a multi-criterion contrac
 
     assert.equal(result.ok, false);
     assert.match(result.text, /frozen multi-criterion contract/);
+  } finally {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("start_goal resets per-contract gate and review history", async () => {
+  const workDir = setupProject();
+  try {
+    const runtime = createSessionRuntime();
+    runtime.state.contract = legacyMetricContract({ metricName: "total_ms", direction: "lower" });
+    runtime.state.gates.push({ verdict: "pass", contractHash: "sha256:old", checkedAt: 1, criteria: [] });
+    runtime.state.reviews.push({ reviewer: "test", at: 1, findings: [] });
+    runtime.state.results.push({ commit: "a", metric: 1, metrics: {}, status: "keep", description: "old", timestamp: 1, experimentIndex: 0, confidence: null });
+
+    const result = await executeExperimentConfigWorkflow({
+      name: "Speed v2",
+      metric_name: "p95_ms",
+      metric_unit: "ms",
+      direction: "lower",
+    }, deps(workDir, runtime, { kind: "start_goal", title: "Experiment started" }));
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(runtime.state.gates, []);
+    assert.deepEqual(runtime.state.reviews, []);
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
   }

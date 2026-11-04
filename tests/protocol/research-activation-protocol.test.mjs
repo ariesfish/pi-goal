@@ -7,9 +7,6 @@ import { tmpdir } from "node:os";
 import {
   composeResearchResumeMessage,
   composeResearchSystemPrompt,
-  decidePendingResearchResume,
-  onResearchResumeDelivered,
-  shouldResumeResearchAfterTurn,
   startResearchActivation,
   syncResearchPhaseFromResearchFiles,
 } from "../../extensions/pi-goal/protocol/research-protocol.ts";
@@ -78,20 +75,6 @@ test("activation protocol owns after-turn resume gate and message", () => {
     metricUnit: "ms",
   });
 
-  assert.equal(shouldResumeResearchAfterTurn(runtime, options), true);
+  assert.equal(runtime.loop.phase, "awaiting_log");
   assert.match(composeResearchResumeMessage(runtime, options), /RESEARCH_LOG_REQUIRED/);
-});
-
-test("activation protocol decides pending resume delivery and updates counters", () => {
-  const runtime = createSessionRuntime();
-  runtime.loop.mode = true;
-  runtime.loop.pendingResumeMessage = "continue";
-
-  assert.deepEqual(decidePendingResearchResume(runtime, options, false), { action: "wait" });
-  assert.deepEqual(decidePendingResearchResume(runtime, options, true), { action: "deliver", message: "continue" });
-
-  onResearchResumeDelivered(runtime);
-
-  assert.equal(runtime.loop.pendingResumeMessage, null);
-  assert.equal(runtime.loop.autoResumeTurns, 1);
 });

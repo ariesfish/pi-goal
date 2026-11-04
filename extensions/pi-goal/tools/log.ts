@@ -143,9 +143,9 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
     text += " " + theme.fg("muted", exp.description);
 
     // Show best metric for context (overall best, not just this run)
-    if (s.bestMetric !== null) {
+    if (s.baselineMetric !== null) {
       // Find the actual best kept metric in the current experiment
-      let best = s.bestMetric;
+      let best = s.baselineMetric;
       for (const r of s.results) {
         if (r.experimentIndex === s.currentExperimentIndex && r.status === "keep" && r.metric > 0) {
           if (isBetter(r.metric, best, s.bestDirection)) best = r.metric;

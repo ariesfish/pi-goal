@@ -138,8 +138,10 @@ function applyExperimentConfigState(
   }
   if (startsLaterExperiment) {
     state.currentExperimentIndex++;
+    state.gates = [];
+    state.reviews = [];
   }
-  state.bestMetric = null;
+  state.baselineMetric = null;
   state.secondaryMetrics = [];
   state.confidence = null;
   state.runLimit = readRunLimit(ctxCwd);

@@ -15,7 +15,7 @@ export function buildResearchSnapshot(state: ResearchState): ResearchSnapshot {
     metric_name: state.metricName,
     metric_unit: state.metricUnit,
     direction: state.bestDirection,
-    baseline_metric: state.bestMetric,
+    baseline_metric: state.baselineMetric,
     best_metric: findBestMetric(state.results, state.currentExperimentIndex, state.bestDirection),
     run_count: state.results.length,
     goal: state.name ?? "",

@@ -7,7 +7,6 @@ import {
 } from "../domain/goal-contract.ts";
 import {
   activationMessage,
-  composeResearchPhaseCompactionResumeMessage,
   composeResearchPhaseResumeMessage,
   researchAwaitingLogBlockMessage,
   researchPhaseSystemPromptFor,
@@ -44,7 +43,6 @@ export interface ResearchPhaseState {
   activationTurns: number;
   autoResumeTurns: number;
   runsSinceAgentStart: number;
-  pendingResumeMessage: string | null;
   lastRun: LastRunSummary | null;
 }
 
@@ -95,7 +93,6 @@ export function createResearchPhaseState(): ResearchPhaseState {
     activationTurns: 0,
     autoResumeTurns: 0,
     runsSinceAgentStart: 0,
-    pendingResumeMessage: null,
     lastRun: null,
   };
 }
@@ -143,7 +140,6 @@ export function beginResearchFraming(state: ResearchPhaseState): void {
   state.phase = "framing";
   state.activationPrompt = null;
   state.activationTurns = 0;
-  state.pendingResumeMessage = null;
   state.lastRun = null;
 }
 
@@ -211,7 +207,6 @@ export function activateResearch(
   state.activationPrompt = snapshot.userGoal;
   state.activationTurns = 0;
   state.autoResumeTurns = 0;
-  state.pendingResumeMessage = null;
   state.lastRun = null;
   return activationMessage(snapshot, options);
 }
@@ -223,7 +218,6 @@ export function deactivateResearch(state: ResearchPhaseState): void {
   state.activationTurns = 0;
   state.autoResumeTurns = 0;
   state.runsSinceAgentStart = 0;
-  state.pendingResumeMessage = null;
   state.lastRun = null;
 }
 
@@ -256,16 +250,11 @@ export function shouldBlockResearchRun(state: ResearchPhaseState): boolean {
   return state.phase === "awaiting_log" && state.lastRun !== null;
 }
 
-export function hasPendingResearchPhaseResume(state: ResearchPhaseState): boolean {
-  return state.pendingResumeMessage !== null;
-}
-
 export function pausePendingResearchPhaseResume(_state: ResearchPhaseState): void {
   // Timer ownership stays in the extension adapter. This function documents the seam.
 }
 
 export function cancelPendingResearchPhaseResume(state: ResearchPhaseState): void {
-  state.pendingResumeMessage = null;
 }
 
 export function markResearchAutoResumeSent(state: ResearchPhaseState): void {
@@ -291,12 +280,7 @@ export function shouldResearchAutoResumeAfterTurn(state: ResearchPhaseState, opt
   return false;
 }
 
-export function shouldResearchAutoResumeAfterCompact(state: ResearchPhaseState): boolean {
-  return state.mode;
-}
-
 export {
-  composeResearchPhaseCompactionResumeMessage,
   composeResearchPhaseResumeMessage,
   researchAwaitingLogBlockMessage,
   researchPhaseSystemPromptFor,

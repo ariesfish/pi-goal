@@ -57,7 +57,7 @@ test("research lifecycle hydrates Research config and Run Results from journal",
 
     assert.equal(hydrated, true);
     assert.equal(state.name, "Speed");
-    assert.equal(state.bestMetric, 100);
+    assert.equal(state.baselineMetric, 100);
     assert.equal(state.results.length, 2);
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });

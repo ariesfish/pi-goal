@@ -56,8 +56,8 @@ function fakeDeps(projectDir, state, execHandler = {}) {
         metric_name: currentState.metricName,
         metric_unit: currentState.metricUnit,
         direction: currentState.bestDirection,
-        baseline_metric: currentState.bestMetric,
-        best_metric: currentState.bestMetric,
+        baseline_metric: currentState.baselineMetric,
+        best_metric: currentState.baselineMetric,
         run_count: currentState.results.length,
         goal: currentState.name ?? "",
       };

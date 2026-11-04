@@ -235,7 +235,7 @@ function prepareRunResult(state: ResearchState, params: LogRunParams): PreparedR
 function commitPreparedRunResult(state: ResearchState, preparedState: ResearchState): void {
   const committed = cloneResearchState(preparedState);
   state.results = committed.results;
-  state.bestMetric = committed.bestMetric;
+  state.baselineMetric = committed.baselineMetric;
   state.bestDirection = committed.bestDirection;
   state.metricName = committed.metricName;
   state.metricUnit = committed.metricUnit;

@@ -29,8 +29,8 @@ function fakeDeps(projectDir, state, overrides = {}) {
         metric_name: currentState.metricName,
         metric_unit: currentState.metricUnit,
         direction: currentState.bestDirection,
-        baseline_metric: currentState.bestMetric,
-        best_metric: currentState.bestMetric,
+        baseline_metric: currentState.baselineMetric,
+        best_metric: currentState.baselineMetric,
         run_count: currentState.results.length,
         goal: currentState.name ?? "",
       };
@@ -190,7 +190,7 @@ test("run logging blocks state mutation when journal append fails", async () => 
     assert.equal(result.ok, false);
     assert.match(result.text, /Failed to write goal\.jsonl/);
     assert.equal(state.results.length, 0);
-    assert.equal(state.bestMetric, null);
+    assert.equal(state.baselineMetric, null);
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });
   }

@@ -96,7 +96,7 @@ test("Research can be initialized, measured, logged, hydrated, and summarized th
 test("start_goal opens a new Experiment whose baseline and best are isolated from previous runs", async () => {
   await withTempResearch("workflow-start-goal", async (workDir) => {
     const runtime = createRuntimeWithMetric();
-    runtime.state.bestMetric = 100;
+    runtime.state.baselineMetric = 100;
     runtime.state.results.push(
       {
         commit: "aaa1111",

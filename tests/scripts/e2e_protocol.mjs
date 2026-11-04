@@ -147,8 +147,8 @@ async function main() {
           metric_name: state.metricName,
           metric_unit: state.metricUnit,
           direction: state.bestDirection,
-          baseline_metric: state.bestMetric,
-          best_metric: state.bestMetric,
+          baseline_metric: state.baselineMetric,
+          best_metric: state.baselineMetric,
           run_count: state.results.length,
           goal: state.name ?? "",
         };

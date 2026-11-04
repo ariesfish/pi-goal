@@ -1,16 +1,10 @@
 import {
   activateResearch,
-  cancelPendingResearchPhaseResume,
-  composeResearchPhaseCompactionResumeMessage,
   composeResearchPhaseResumeMessage,
   deactivateResearch,
   detectPhaseFromFiles,
   enterResearchSealedFromFiles,
   enterResearchNeedsInitFromFiles,
-  hasPendingResearchPhaseResume,
-  hasReachedResearchAutoResumeLimit,
-  markResearchAutoResumeSent,
-  shouldResearchAutoResumeAfterCompact,
   shouldResearchAutoResumeAfterTurn,
   researchPhaseSystemPromptFor,
   type ResearchProtocolOptions,
@@ -24,12 +18,6 @@ import {
 import type { SessionRuntime } from "../support/runtime.ts";
 import type { ResearchState } from "../domain/research-state.ts";
 import { legacyMetricContract } from "../domain/goal-contract.ts";
-
-export type PendingResearchResumeDecision =
-  | { action: "deliver"; message: string }
-  | { action: "cancel" }
-  | { action: "limit_reached" }
-  | { action: "wait" };
 
 export interface ActivationStartDecision {
   kickoff: string;
@@ -98,48 +86,7 @@ export function startResearchActivation(
   };
 }
 
-export function shouldResumeResearchAfterTurn(runtime: SessionRuntime, options: ResearchProtocolOptions): boolean {
-  return shouldResearchAutoResumeAfterTurn(runtime.loop, options);
-}
-
-export function shouldResumeResearchAfterCompact(runtime: SessionRuntime): boolean {
-  return shouldResearchAutoResumeAfterCompact(runtime.loop);
-}
-
 export function composeResearchResumeMessage(runtime: SessionRuntime, options: ResearchProtocolOptions): string {
   return composeResearchPhaseResumeMessage(runtime.loop, options);
 }
 
-export function composeResearchCompactionResumeMessage(options: ResearchProtocolOptions): string {
-  return composeResearchPhaseCompactionResumeMessage(options);
-}
-
-export function hasPendingResearchResume(runtime: SessionRuntime): boolean {
-  return hasPendingResearchPhaseResume(runtime.loop);
-}
-
-export function cancelResearchResume(runtime: SessionRuntime): void {
-  cancelPendingResearchPhaseResume(runtime.loop);
-}
-
-export function decidePendingResearchResume(
-  runtime: SessionRuntime,
-  options: ResearchProtocolOptions,
-  isAgentSettled: boolean,
-): PendingResearchResumeDecision {
-  const message = runtime.loop.pendingResumeMessage;
-  if (!message) return { action: "wait" };
-  if (!runtime.loop.mode) return { action: "cancel" };
-  if (!isAgentSettled) return { action: "wait" };
-  if (hasReachedResearchAutoResumeLimit(runtime.loop, options)) return { action: "limit_reached" };
-  return { action: "deliver", message };
-}
-
-export function onResearchResumeDelivered(runtime: SessionRuntime): void {
-  cancelResearchResume(runtime);
-  markResearchAutoResumeSent(runtime.loop);
-}
-
-export function shouldNotifyResearchResumeLimit(runtime: SessionRuntime, options: ResearchProtocolOptions): boolean {
-  return hasReachedResearchAutoResumeLimit(runtime.loop, options);
-}

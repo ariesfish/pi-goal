@@ -110,7 +110,7 @@ export async function executeRunExperimentWorkflow(
     truncation,
     fullOutputPath,
     requirePrimaryMetric: shouldUseScriptCommandOnly(fileContract),
-    bestMetric: findBestMetric(state.results, state.currentExperimentIndex, state.bestDirection) ?? state.bestMetric,
+    bestMetric: findBestMetric(state.results, state.currentExperimentIndex, state.bestDirection) ?? state.baselineMetric,
   });
 
   return {

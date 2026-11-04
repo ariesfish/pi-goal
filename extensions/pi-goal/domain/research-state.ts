@@ -28,7 +28,7 @@ export interface MetricDef {
 
 export interface ResearchState extends GoalProtocolState {
   results: RunResult[];
-  bestMetric: number | null;
+  baselineMetric: number | null;
   bestDirection: "lower" | "higher";
   metricName: string;
   metricUnit: string;
@@ -47,7 +47,7 @@ export function createResearchState(): ResearchState {
   return {
     ...emptyGoalProtocolState(),
     results: [],
-    bestMetric: null,
+    baselineMetric: null,
     bestDirection: "lower",
     metricName: "metric",
     metricUnit: "",

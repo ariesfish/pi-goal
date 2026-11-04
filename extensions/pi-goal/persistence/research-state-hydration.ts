@@ -80,7 +80,7 @@ export function hydrateResearchStateFromJournalModel(state: ResearchState, model
   state.benchmarkEditsAllowed = model.benchmarkEditsAllowed;
 
   if (state.results.length === 0) return false;
-  state.bestMetric = findBaselineMetric(state.results, state.currentExperimentIndex);
+  state.baselineMetric = findBaselineMetric(state.results, state.currentExperimentIndex);
   state.confidence = computeConfidence(state.results, state.currentExperimentIndex, state.bestDirection);
   return true;
 }

@@ -59,7 +59,7 @@ export function applyRunResult(state: ResearchState, params: LogRunParams): Appl
 
   state.results.push(runResult);
   registerSecondaryMetrics(state, secondaryMetrics);
-  state.bestMetric = findBaselineMetric(state.results, state.currentExperimentIndex);
+  state.baselineMetric = findBaselineMetric(state.results, state.currentExperimentIndex);
   state.confidence = computeConfidence(state.results, state.currentExperimentIndex, state.bestDirection);
   runResult.confidence = state.confidence;
 

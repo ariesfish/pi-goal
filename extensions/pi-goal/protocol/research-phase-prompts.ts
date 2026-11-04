@@ -127,16 +127,6 @@ export function composeResearchPhaseResumeMessage(state: ResearchPhaseState, opt
   ].join("\n");
 }
 
-export function composeResearchPhaseCompactionResumeMessage(options: ResearchProtocolOptions): string {
-  return [
-    "RESEARCH_NEXT_RUN_REQUIRED",
-    "Continue the current research phase now.",
-    "Read the phase-specific required action from the system prompt, then act on it.",
-    "Pick the most promising hypothesis from the ideas backlog or the latest `next:` hints in recent runs.",
-    "Do not re-read goal.md or goal.jsonl — the compaction summary already contains them.",
-    options.benchmarkGuardrail,
-  ].join("\n");
-}
 
 export function researchPhaseSystemPromptFor(state: ResearchPhaseState, snapshot: PromptSnapshot, options: ResearchProtocolOptions): string {
   if (!state.mode && !(snapshot.hasRules && snapshot.hasBenchmarkScript && !snapshot.hasConfig)) return "";

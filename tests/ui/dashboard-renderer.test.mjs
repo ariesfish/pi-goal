@@ -15,7 +15,7 @@ test("dashboard full mode renders runs older than the default summary recent lim
   state.metricName = "total_ms";
   state.metricUnit = "ms";
   state.bestDirection = "lower";
-  state.bestMetric = 100;
+  state.baselineMetric = 100;
 
   for (let i = 1; i <= 75; i++) {
     state.results.push({

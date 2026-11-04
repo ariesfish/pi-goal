@@ -47,7 +47,6 @@ import { readLastRunResult } from "./persistence/research-journal.ts";
 import { buildResearchSnapshot } from "./domain/research-snapshot.ts";
 import { readResearchFileContract } from "./persistence/research-files.ts";
 import {
-  cancelResearchResume,
   composeResearchResumeMessage,
   composeResearchSystemPrompt,
 } from "./protocol/research-protocol.ts";
@@ -132,7 +131,6 @@ export default function goalExtension(pi: ExtensionAPI) {
 
   const reconstructState = (ctx: ExtensionContext) => {
     const runtime = getRuntime(ctx);
-    cancelResearchResume(runtime);
     restoreActiveResearchRuntime({
       runtime,
       workDir: resolveWorkDir(ctx.cwd),
@@ -166,7 +164,6 @@ export default function goalExtension(pi: ExtensionAPI) {
   });
   pi.on("session_shutdown", async (_e, ctx) => {
     clearSessionUi(ctx);
-    cancelResearchResume(getRuntime(ctx));
     runtimeStore.clear(getSessionKey(ctx));
     stopDashboardServer();
   });
