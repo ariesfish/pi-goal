@@ -7,7 +7,7 @@ import type { HookPayload } from "../execution/hooks.ts";
 import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
 import { resolveResearchToolContext } from "./tool-adapter.ts";
 import { readResearchFileContract } from "../persistence/research-files.ts";
-import { readLastRunResult } from "../persistence/research-journal.ts";
+import { appendJournalEntry, policyJournalEntry, readLastRunResult } from "../persistence/research-journal.ts";
 import { activeResearch, selectActiveResearch } from "../persistence/research-directory.ts";
 import { clearResearchPhase, deactivateResearch, type ResearchProtocolOptions } from "../protocol/research-phase.ts";
 import { cancelResearchResume, startResearchActivation } from "../protocol/research-protocol.ts";
@@ -54,6 +54,11 @@ async function handleGoalCommand(
     return;
   }
 
+  if (command === "allow-tests" || command === "protect-tests") {
+    toggleTestEdits(pi, ctx, deps, runtime, command === "allow-tests");
+    return;
+  }
+
   if (command === "export") {
     const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
     if (!contextResult.ok) {
@@ -89,7 +94,7 @@ async function handleGoalCommand(
 
 function goalCommandHelp(): string {
   return [
-    "Usage: /goal [off|clear|export|reinit|select <research-id>|<text>]",
+    "Usage: /goal [off|clear|export|reinit|select <research-id>|allow-tests|protect-tests|<text>]",
     "",
     "<text> enters goal mode and starts or resumes the loop.",
     "reinit starts a new experiment in the active research with a fresh baseline.",
@@ -97,6 +102,7 @@ function goalCommandHelp(): string {
     "off leaves goal mode.",
     "clear deletes goal.jsonl and turns goal mode off.",
     "export opens a local live dashboard for goal.jsonl in your browser.",
+    "allow-tests unlocks test-file edits for the sealed research; protect-tests restores the block.",
     "",
     "Examples:",
     "  /goal optimize unit test runtime, monitor correctness",
@@ -156,6 +162,36 @@ function requestExperimentStart(
     "Call start_goal with the updated metric, unit, and direction, then run the new baseline with run_goal and log_goal.",
     "Use this only if the Research target is unchanged but the primary metric, direction, workload, measurement method, or baseline comparability changed.",
   ].join("\n"));
+}
+
+function toggleTestEdits(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  deps: GoalCommandDeps,
+  runtime: SessionRuntime,
+  allow: boolean,
+): void {
+  if (!runtime.state.contract) {
+    ctx.ui.notify("No frozen contract yet — test protection starts after freeze_criteria.", "info");
+    return;
+  }
+  const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
+  if (!contextResult.ok) {
+    ctx.ui.notify(contextResult.text.replace(/^❌\s*/, ""), "error");
+    return;
+  }
+  runtime.state.testEditsAllowed = allow;
+  const journalError = appendJournalEntry(contextResult.context.workDir, policyJournalEntry(allow));
+  if (journalError) {
+    ctx.ui.notify(journalError, "error");
+    return;
+  }
+  ctx.ui.notify(
+    allow
+      ? "Test edits allowed for this research. Gate L2 will not block test-file changes."
+      : "Test protection restored for this research.",
+    "info",
+  );
 }
 
 function sendWhenReady(pi: ExtensionAPI, ctx: ExtensionContext, message: string): void {

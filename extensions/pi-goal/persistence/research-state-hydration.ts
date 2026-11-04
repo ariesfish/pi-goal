@@ -51,6 +51,7 @@ export function hydrateResearchStateFromJournalModel(state: ResearchState, model
           metric: criterion.metric ? { ...criterion.metric } : undefined,
         })),
         testGlobs: [...model.contract.testGlobs],
+        scopeGlobs: [...model.contract.scopeGlobs],
       }
     : model.hasConfig
       ? legacyMetricContract({
@@ -75,6 +76,7 @@ export function hydrateResearchStateFromJournalModel(state: ResearchState, model
     })),
   }));
   state.attempts = model.attempts.map((attempt) => ({ ...attempt }));
+  state.testEditsAllowed = model.testEditsAllowed;
 
   if (state.results.length === 0) return false;
   state.bestMetric = findBaselineMetric(state.results, state.currentExperimentIndex);

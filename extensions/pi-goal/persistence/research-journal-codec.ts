@@ -54,6 +54,7 @@ export interface ResearchJournalRun {
 
 export interface ResearchJournalModel extends GoalProtocolState {
   hasConfig: boolean;
+  testEditsAllowed: boolean;
   name: string | null;
   metricName: string;
   metricUnit: string;
@@ -104,6 +105,7 @@ function reconstructedState(): ResearchJournalModel {
   return {
     ...emptyGoalProtocolState(),
     hasConfig: false,
+    testEditsAllowed: false,
     name: null,
     metricName: DEFAULT_METRIC_NAME,
     metricUnit: DEFAULT_METRIC_UNIT,
@@ -225,6 +227,7 @@ function contractFrom(value: unknown): GoalContract | null {
     objective: isString(value.objective) ? value.objective : "",
     criteria,
     testGlobs: stringArrayFrom(value.testGlobs),
+    scopeGlobs: stringArrayFrom(value.scopeGlobs),
     allowTestEdits: value.allowTestEdits === true,
     frozenAt: isNumber(value.frozenAt) ? value.frozenAt : 0,
     hash: value.hash,
@@ -330,7 +333,7 @@ function reviewFindingFrom(value: unknown): ReviewFinding | null {
   };
 }
 
-function reviewFrom(value: unknown): ReviewResult | null {
+export function reviewResultFrom(value: unknown): ReviewResult | null {
   if (!isObjectRecord(value)) return null;
   if (!isString(value.reviewer) || !Array.isArray(value.findings)) return null;
   const findings: ReviewFinding[] = [];
@@ -442,7 +445,7 @@ export function parseResearchJournalModel(jsonlContent: string): ResearchJournal
     }
 
     if (entry.type === "review") {
-      const review = reviewFrom(entry.review);
+      const review = reviewResultFrom(entry.review);
       if (review) state.reviews.push(review);
       continue;
     }
@@ -450,6 +453,11 @@ export function parseResearchJournalModel(jsonlContent: string): ResearchJournal
     if (entry.type === "attempt") {
       const attempt = attemptFrom(entry.attempt);
       if (attempt) state.attempts.push(attempt);
+      continue;
+    }
+
+    if (entry.type === "policy" && isObjectRecord(entry.policy)) {
+      state.testEditsAllowed = entry.policy.allowTestEdits === true;
       continue;
     }
 

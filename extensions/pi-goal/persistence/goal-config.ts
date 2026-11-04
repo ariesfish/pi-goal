@@ -3,9 +3,17 @@ import * as path from "node:path";
 
 import { researchConfigPath } from "./research-directory.ts";
 
+export interface ReviewerConfig {
+  command: string;
+  args?: string[];
+  timeoutSeconds?: number;
+  blocking?: boolean;
+}
+
 export interface ResearchConfig {
   maxIterations?: number;
   workingDir?: string;
+  reviewer?: ReviewerConfig;
 }
 
 export type ConfigResult =
@@ -58,7 +66,44 @@ export function readConfig(cwd: string): ConfigResult {
     config.workingDir = parsed.workingDir;
   }
 
+  if (parsed.reviewer !== undefined) {
+    const reviewer = parsed.reviewer;
+    if (!isRecord(reviewer) || typeof reviewer.command !== "string" || reviewer.command.trim() === "") {
+      return {
+        ok: false,
+        config: {},
+        error: `Invalid goal.config.json at ${configPath}: reviewer.command must be a non-empty string.`,
+      };
+    }
+    if (reviewer.args !== undefined && (!Array.isArray(reviewer.args) || !reviewer.args.every((arg) => typeof arg === "string"))) {
+      return {
+        ok: false,
+        config: {},
+        error: `Invalid goal.config.json at ${configPath}: reviewer.args must be an array of strings.`,
+      };
+    }
+    if (reviewer.timeoutSeconds !== undefined && (typeof reviewer.timeoutSeconds !== "number" || reviewer.timeoutSeconds <= 0)) {
+      return {
+        ok: false,
+        config: {},
+        error: `Invalid goal.config.json at ${configPath}: reviewer.timeoutSeconds must be a positive number.`,
+      };
+    }
+    config.reviewer = {
+      command: reviewer.command,
+      args: reviewer.args,
+      timeoutSeconds: reviewer.timeoutSeconds,
+      blocking: reviewer.blocking === true,
+    };
+  }
+
   return { ok: true, config, error: null };
+}
+
+export function readReviewerConfig(cwd: string): ReviewerConfig | null {
+  const result = readConfig(cwd);
+  if (!result.ok || !result.config.reviewer) return null;
+  return result.config.reviewer;
 }
 
 export function readRunLimit(cwd: string): number | null {

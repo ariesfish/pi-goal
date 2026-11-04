@@ -117,3 +117,7 @@ export function directionJournalEntry(direction: Direction): Record<string, unkn
 export function probeJournalEntry(probe: ProbeRecord): Record<string, unknown> {
   return { type: "probe", probe };
 }
+
+export function policyJournalEntry(allowTestEdits: boolean): Record<string, unknown> {
+  return { type: "policy", policy: { allowTestEdits, at: Date.now() } };
+}

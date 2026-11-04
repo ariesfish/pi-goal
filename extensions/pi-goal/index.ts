@@ -53,10 +53,12 @@ import {
 } from "./protocol/research-protocol.ts";
 import { decideBoundaryContinuation } from "./protocol/boundary-resume.ts";
 import { markResearchAutoResumeSent } from "./protocol/research-phase.ts";
+import { sealedToolCallBlock } from "./protocol/sealed-guards.ts";
 import { restoreActiveResearchRuntime } from "./support/research-runtime-restore.ts";
 import { registerGoalCommand } from "./tools/goal-command.ts";
 import { registerGoalContractTools } from "./tools/contract.ts";
 import { registerCheckGoalTool } from "./tools/check.ts";
+import { registerReviewGoalTool } from "./tools/review.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -164,6 +166,21 @@ export default function goalExtension(pi: ExtensionAPI) {
     dashboardOverlay.requestRender();
   });
 
+  // Sealed phase: the extension owns test edits, git mutations, and research state.
+  pi.on("tool_call", async (event, ctx) => {
+    const runtime = getRuntime(ctx);
+    const reason = sealedToolCallBlock(
+      {
+        phase: runtime.loop.phase,
+        contract: runtime.state.contract,
+        testEditsAllowed: runtime.state.testEditsAllowed,
+      },
+      { toolName: event.toolName, input: event.input as Record<string, unknown> },
+    );
+    if (!reason) return;
+    return { block: true, reason };
+  });
+
   // Final actionable boundary: request one continuation instead of racing a timer.
   pi.on("agent_before_settle", async (event, ctx) => {
     const runtime = getRuntime(ctx);
@@ -251,6 +268,13 @@ export default function goalExtension(pi: ExtensionAPI) {
     updateWidget,
     broadcastDashboardUpdate,
     readLastRun,
+  });
+
+  registerReviewGoalTool(pi, {
+    exec: pi,
+    getRuntime,
+    updateWidget,
+    broadcastDashboardUpdate,
   });
 
   // -----------------------------------------------------------------------

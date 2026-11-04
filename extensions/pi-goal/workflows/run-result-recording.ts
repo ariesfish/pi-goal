@@ -32,6 +32,8 @@ import {
 } from "../execution/gate-runner.ts";
 import { checkResearchWorkspace } from "../workspace/research-workspace.ts";
 import { activeResearch } from "../persistence/research-directory.ts";
+import { readReviewerConfig } from "../persistence/goal-config.ts";
+import { runReview } from "./review-workflow.ts";
 
 export interface RecordRunResultDeps {
   pi: WorkspaceExecAdapter;
@@ -78,6 +80,7 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
   if (validationError) return { ok: false, text: validationError };
 
   let gateSummary = "";
+  let reviewSummary = "";
   let gateCriteriaIds: string[] | undefined;
   let gateHash: string | undefined;
   if (state.contract && params.status === "keep") {
@@ -104,9 +107,45 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
     gateHash = gate.contractHash;
   }
 
+  if (state.contract && params.status === "keep") {
+    const reviewer = readReviewerConfig(deps.workDir);
+    if (reviewer) {
+      try {
+        const workspace = await checkResearchWorkspace(deps.pi, deps.workDir);
+        const review = await runReview({
+          pi: deps.pi,
+          workDir: deps.workDir,
+          contract: state.contract,
+          state,
+          reviewer,
+          changedPaths: workspace.userPaths,
+        });
+        const reviewError = appendJournalEntry(deps.workDir, {
+          type: "review",
+          review: review.review,
+        });
+        if (reviewError) return { ok: false, text: reviewError };
+        reviewSummary = review.text;
+        if (review.deniedKeep) {
+          return {
+            ok: false,
+            text: `${review.text}\n❌ Keep denied: the reviewer reproduced a blocking finding. Fix it and rerun, or log as discard with the finding in ASI.`,
+          };
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (reviewer.blocking) {
+          return { ok: false, text: `❌ Reviewer failed while blocking is enabled: ${message}` };
+        }
+        reviewSummary = `⚠️ Reviewer failed (advisory): ${message}`;
+      }
+    }
+  }
+
   const prepared = prepareRunResult(state, params);
   let text = formatLogSummary({ state: prepared.state, applied: prepared.applied, params });
   if (gateSummary) text = `${gateSummary}\n${text}`;
+  if (reviewSummary) text = `${reviewSummary}\n${text}`;
 
   const keepResult = await applyKeptRunResultTransaction({
     pi: deps.pi,

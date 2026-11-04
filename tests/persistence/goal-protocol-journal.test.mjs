@@ -224,3 +224,20 @@ test("journal model exposes the protocol state alongside runs", () => {
   assert.equal(model.contract?.hash, "sha256:contract-1");
   assert.equal(model.results.length, 1);
 });
+
+test("policy entries replay the test edit policy", () => {
+  const allowed = researchStateFromJournal(journal([
+    LEGACY_CONFIG,
+    LEGACY_RUN,
+    { type: "policy", policy: { allowTestEdits: true, at: 5 } },
+  ]));
+  assert.equal(allowed.testEditsAllowed, true);
+
+  const restored = researchStateFromJournal(journal([
+    LEGACY_CONFIG,
+    LEGACY_RUN,
+    { type: "policy", policy: { allowTestEdits: true, at: 5 } },
+    { type: "policy", policy: { allowTestEdits: false, at: 6 } },
+  ]));
+  assert.equal(restored.testEditsAllowed, false);
+});

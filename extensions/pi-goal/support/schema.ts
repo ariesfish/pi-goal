@@ -90,6 +90,12 @@ export const LogParams = Type.Object({
         "Set to true to allow adding a new secondary metric that wasn't tracked before. Only use for metrics that have proven very valuable to watch.",
     })
   ),
+  force_keep: Type.Optional(
+    Type.Boolean({
+      description:
+        "Only with a gate-approved keep whose improvement is within noise: keep anyway, explaining why in asi.reason.",
+    })
+  ),
   asi: Type.Optional(
     Type.Unsafe<Record<string, unknown>>({
       type: "object",
@@ -153,5 +159,16 @@ export const FreezeCriteriaParams = Type.Object({
   objective: Type.String(),
   criteria: Type.Array(CriterionSchema, { minItems: 1 }),
   test_globs: Type.Optional(Type.Array(Type.String())),
+  scope_globs: Type.Optional(Type.Array(Type.String())),
   allow_test_edits: Type.Optional(Type.Boolean()),
 });
+
+export const CheckGoalParams = Type.Object({
+  metric: Type.Optional(
+    Type.Number({
+      description: "Primary metric value to check. Defaults to the last logged run's metric.",
+    }),
+  ),
+});
+
+export const ReviewGoalParams = Type.Object({});

@@ -37,6 +37,8 @@ export interface ResearchState extends GoalProtocolState {
   currentExperimentIndex: number;
   runLimit: number | null;
   confidence: number | null;
+  /** Session policy: allow test edits even when the contract protects them. */
+  testEditsAllowed: boolean;
 }
 
 export function createResearchState(): ResearchState {
@@ -52,6 +54,7 @@ export function createResearchState(): ResearchState {
     currentExperimentIndex: 0,
     runLimit: null,
     confidence: null,
+    testEditsAllowed: false,
   };
 }
 
@@ -73,6 +76,7 @@ export function cloneResearchState(state: ResearchState): ResearchState {
             metric: criterion.metric ? { ...criterion.metric } : undefined,
           })),
           testGlobs: [...state.contract.testGlobs],
+          scopeGlobs: [...state.contract.scopeGlobs],
         }
       : null,
     directions: state.directions.map((direction) => ({
@@ -92,6 +96,7 @@ export function cloneResearchState(state: ResearchState): ResearchState {
       })),
     })),
     attempts: state.attempts.map((attempt) => ({ ...attempt })),
+    testEditsAllowed: state.testEditsAllowed,
   };
 }
 
