@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 
 import type { ResearchState, RunResult } from "../domain/research-state.ts";
+import type { Direction, GoalContract, ProbeRecord } from "../domain/goal-contract.ts";
 import { activeResearch, ensureActiveResearch } from "./research-directory.ts";
 import {
   hydrateResearchStateFromJournal,
@@ -94,4 +95,25 @@ export function appendRunResultToJournal(workDir: string, entry: Record<string, 
 
 function journalWriteError(error: unknown): string {
   return `⚠️ Failed to write goal.jsonl: ${error instanceof Error ? error.message : String(error)}`;
+}
+
+export function appendJournalEntry(workDir: string, entry: object): string | null {
+  try {
+    fs.appendFileSync(ensureActiveResearch(workDir).paths.journal, JSON.stringify(entry) + "\n");
+    return null;
+  } catch (error) {
+    return journalWriteError(error);
+  }
+}
+
+export function contractJournalEntry(contract: GoalContract): Record<string, unknown> {
+  return { type: "contract", contract };
+}
+
+export function directionJournalEntry(direction: Direction): Record<string, unknown> {
+  return { type: "direction", direction };
+}
+
+export function probeJournalEntry(probe: ProbeRecord): Record<string, unknown> {
+  return { type: "probe", probe };
 }

@@ -56,6 +56,7 @@ import {
 } from "./protocol/research-protocol.ts";
 import { restoreActiveResearchRuntime } from "./support/research-runtime-restore.ts";
 import { registerGoalCommand } from "./tools/goal-command.ts";
+import { registerGoalContractTools } from "./tools/contract.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -241,6 +242,16 @@ export default function goalExtension(pi: ExtensionAPI) {
   };
   registerInitExperimentTool(pi, experimentConfigToolDeps);
   registerStartExperimentTool(pi, experimentConfigToolDeps);
+
+  // -----------------------------------------------------------------------
+  // goal contract tools: frame_goal, probe_goal, freeze_criteria
+  // -----------------------------------------------------------------------
+
+  registerGoalContractTools(pi, {
+    getRuntime,
+    updateWidget,
+    broadcastDashboardUpdate,
+  });
 
   // -----------------------------------------------------------------------
   // run_goal tool

@@ -191,6 +191,7 @@ function criterionMetricFrom(value: unknown): CriterionMetric | undefined {
   return {
     name: value.name,
     direction: value.direction,
+    unit: isString(value.unit) ? value.unit : undefined,
     minDeltaPct: isNumber(value.minDeltaPct) ? value.minDeltaPct : undefined,
   };
 }

@@ -99,3 +99,59 @@ export const LogParams = Type.Object({
     })
   ),
 });
+
+export const FrameGoalParams = Type.Object({
+  directions: Type.Array(
+    Type.Object({
+      id: Type.String({ description: "Short stable id, e.g. D1" }),
+      title: Type.String(),
+      mechanism: Type.String({ description: "The distinct mechanism this direction relies on" }),
+      proxyMetric: Type.String({ description: "Metric this probe will measure" }),
+      cost: Type.String({ description: "Rough cost to probe" }),
+      risk: Type.String({ description: "Main risk or failure mode" }),
+      killIf: Type.String({ description: "Observable condition that kills this direction" }),
+    }),
+    { minItems: 1, maxItems: 8 },
+  ),
+});
+
+export const ProbeGoalParams = Type.Object({
+  direction_id: Type.String(),
+  command: Type.String({ description: "Command to run for this probe" }),
+  timeout_seconds: Type.Optional(Type.Number({ description: "Kill the probe after this many seconds (default 120)" })),
+  value: Type.Optional(Type.Number({ description: "Measured value when the command does not emit a METRIC line" })),
+  decision: stringEnum(["keep", "kill"] as const),
+  note: Type.Optional(Type.String()),
+});
+
+const CriterionSchema = Type.Object({
+  id: Type.String(),
+  statement: Type.String(),
+  kind: stringEnum(["metric", "command", "test", "manual"] as const),
+  blocking: Type.Boolean(),
+  check: Type.Optional(
+    Type.Object({
+      command: Type.String(),
+      expect: stringEnum(["exit0", "stdout_contains", "stdout_regex"] as const),
+      pattern: Type.Optional(Type.String()),
+      timeout_seconds: Type.Optional(Type.Number()),
+    }),
+  ),
+  metric: Type.Optional(
+    Type.Object({
+      name: Type.String(),
+      direction: stringEnum(["lower", "higher"] as const),
+      unit: Type.Optional(Type.String()),
+      min_delta_pct: Type.Optional(Type.Number()),
+    }),
+  ),
+  guard_of: Type.Optional(Type.String()),
+});
+
+export const FreezeCriteriaParams = Type.Object({
+  name: Type.Optional(Type.String()),
+  objective: Type.String(),
+  criteria: Type.Array(CriterionSchema, { minItems: 1 }),
+  test_globs: Type.Optional(Type.Array(Type.String())),
+  allow_test_edits: Type.Optional(Type.Boolean()),
+});

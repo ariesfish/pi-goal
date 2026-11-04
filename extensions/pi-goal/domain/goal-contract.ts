@@ -15,6 +15,7 @@ export interface CriterionCheck {
 export interface CriterionMetric {
   name: string;
   direction: MetricDirection;
+  unit?: string;
   minDeltaPct?: number;
 }
 
@@ -241,6 +242,22 @@ export function allDirectionsClosed(directions: Direction[]): { ok: boolean; rea
     };
   }
   return { ok: true };
+}
+
+export function primaryMetricCriterion(contract: GoalContract): { ok: boolean; criterion?: Criterion; reason?: string } {
+  const metrics = contract.criteria.filter(
+    (criterion) => criterion.kind === "metric" && criterion.blocking,
+  );
+  if (metrics.length === 0) {
+    return { ok: false, reason: "The contract needs one blocking metric criterion as the primary target." };
+  }
+  if (metrics.length > 1) {
+    return {
+      ok: false,
+      reason: `Exactly one blocking metric criterion may define the primary target; found ${metrics.map((criterion) => criterion.id).join(", ")}.`,
+    };
+  }
+  return { ok: true, criterion: metrics[0] };
 }
 
 export function contractReadyToSeal(contract: GoalContract | null): { ok: boolean; reason?: string } {
