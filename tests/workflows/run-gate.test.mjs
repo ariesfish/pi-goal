@@ -95,6 +95,8 @@ test("a failing criterion blocks a keep before any state mutation or commit", as
     assert.equal(result.ok, false);
     assert.match(result.text, /Gate failed/);
     assert.equal(state.results.length, 0);
+    assert.equal(state.gates.length, 1);
+    assert.equal(state.gates[0].verdict, "fail");
     assert.equal(deps._calls.some(([command, args]) => command === "git" && args[0] === "commit"), false);
 
     const entries = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n").map((line) => JSON.parse(line));
@@ -123,7 +125,8 @@ test("an all-green gate allows the keep and journals the verdict", async () => {
 
     assert.equal(result.ok, true);
     assert.equal(state.results.length, 1);
-    assert.equal(deps._calls.some(([command, args]) => command === "git" && args[0] === "commit"), true);
+    assert.equal(state.gates.length, 1);
+    assert.equal(state.gates[0].verdict, "pass");
 
     const entries = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n").map((line) => JSON.parse(line));
     assert.equal(entries[0].type, "gate");

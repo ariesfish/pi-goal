@@ -169,6 +169,11 @@ export const CheckGoalParams = Type.Object({
       description: "Primary metric value to check. Defaults to the last logged run's metric.",
     }),
   ),
+  metrics: Type.Optional(
+    Type.Record(Type.String(), Type.Number(), {
+      description: "Guard metric values for non-primary metric criteria.",
+    }),
+  ),
 });
 
 export const ReviewGoalParams = Type.Object({});

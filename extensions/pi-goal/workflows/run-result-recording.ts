@@ -94,11 +94,13 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
       contract: state.contract,
       state,
       metric: params.metric,
+      metrics: params.metrics,
       changedPaths: workspace.userPaths,
       forceKeep: params.force_keep === true,
     });
     const gateError = appendJournalEntry(deps.workDir, gateJournalEntry(gate));
     if (gateError) return { ok: false, text: gateError };
+    state.gates.push(gate);
     if (gate.verdict === "fail") return { ok: false, text: formatGateFailure(gate) };
     gateSummary = formatGateSummary(gate);
     gateCriteriaIds = gate.criteria
@@ -125,6 +127,7 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
           review: review.review,
         });
         if (reviewError) return { ok: false, text: reviewError };
+        state.reviews.push(review.review);
         reviewSummary = review.text;
         if (review.deniedKeep) {
           return {

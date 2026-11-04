@@ -20,6 +20,7 @@ export interface GateOptions {
   contract: GoalContract;
   state: ResearchState;
   metric: number;
+  metrics?: Record<string, number>;
   changedPaths: string[];
   forceKeep?: boolean;
 }
@@ -116,8 +117,28 @@ function evaluateMetricCriterion(criterion: Criterion, options: GateOptions): Cr
     };
   }
 
-  const baseline = runs[0].metric;
-  const current = options.metric;
+  const baseline = metric.name === options.state.metricName
+    ? runs[0].metric
+    : runs[0].metrics?.[metric.name];
+  const current = metric.name === options.state.metricName
+    ? options.metric
+    : options.metrics?.[metric.name];
+  if (baseline === undefined) {
+    return {
+      criterionId: criterion.id,
+      pass: false,
+      blocking: criterion.blocking,
+      detail: `missing baseline value for ${metric.name}`,
+    };
+  }
+  if (current === undefined) {
+    return {
+      criterionId: criterion.id,
+      pass: false,
+      blocking: criterion.blocking,
+      detail: `missing metric value for ${metric.name}; primary metric is ${options.state.metricName}`,
+    };
+  }
   const delta = metric.direction === "lower" ? baseline - current : current - baseline;
   const relativePct = baseline === 0 ? null : (delta / Math.abs(baseline)) * 100;
   const requiredPct = metric.minDeltaPct ?? 0;

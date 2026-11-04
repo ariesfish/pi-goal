@@ -65,10 +65,12 @@ export function registerCheckGoalTool(pi: ExtensionAPI, deps: CheckGoalToolDeps)
         contract,
         state: runtime.state,
         metric,
+        metrics: params.metrics,
         changedPaths: workspace.userPaths,
       });
       const journalError = appendJournalEntry(workDir, gateJournalEntry(gate));
       if (journalError) return textToolResult(journalError);
+      runtime.state.gates.push(gate);
 
       deps.updateWidget(ctx);
       deps.broadcastDashboardUpdate(workDir);

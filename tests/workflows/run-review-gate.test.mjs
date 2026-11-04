@@ -123,6 +123,8 @@ test("a reproduced blocking finding from the reviewer denies a keep", async () =
     assert.equal(result.ok, false);
     assert.match(result.text, /Keep denied/);
     assert.equal(state.results.length, 0);
+    assert.equal(state.reviews.length, 1);
+    assert.equal(state.reviews[0].findings[0].reproduced, true);
     assert.equal(deps._calls.some(([command, args]) => command === "git" && args[0] === "commit"), false);
 
     const entries = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n").map((line) => JSON.parse(line));
@@ -153,6 +155,7 @@ test("an unreproduced finding records a review but allows the keep", async () =>
 
     assert.equal(result.ok, true);
     assert.equal(state.results.length, 1);
+    assert.equal(state.reviews.length, 1);
     assert.match(result.text, /not reproduced/);
 
     const entries = fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n").map((line) => JSON.parse(line));

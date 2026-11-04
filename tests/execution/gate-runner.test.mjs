@@ -277,3 +277,53 @@ test("the session test-edit policy unlocks protected files", async () => {
   });
   assert.equal(gate.verdict, "pass");
 });
+
+test("guard metric criteria compare their own metric, not the primary", async () => {
+  const contract = baseContract({
+    criteria: [
+      metricCriterion(),
+      {
+        id: "C3",
+        statement: "bundle does not grow",
+        kind: "metric",
+        blocking: true,
+        metric: { name: "bundle_kb", direction: "lower" },
+      },
+    ],
+  });
+  const baseline = { ...runRecord(100), metrics: { bundle_kb: 50 } };
+
+  const guardOk = await runGate({
+    pi: fakePi(),
+    workDir: "/tmp",
+    contract,
+    state: stateWith([baseline]),
+    metric: 90,
+    metrics: { bundle_kb: 45 },
+    changedPaths: [],
+  });
+  assert.equal(guardOk.verdict, "pass");
+
+  const guardBad = await runGate({
+    pi: fakePi(),
+    workDir: "/tmp",
+    contract,
+    state: stateWith([baseline]),
+    metric: 90,
+    metrics: { bundle_kb: 70 },
+    changedPaths: [],
+  });
+  assert.equal(guardBad.verdict, "fail");
+  assert.match(guardBad.criteria.find((v) => v.criterionId === "C3").detail, /did not improve/);
+
+  const missing = await runGate({
+    pi: fakePi(),
+    workDir: "/tmp",
+    contract,
+    state: stateWith([baseline]),
+    metric: 90,
+    changedPaths: [],
+  });
+  assert.equal(missing.verdict, "fail");
+  assert.match(missing.criteria.find((v) => v.criterionId === "C3").detail, /missing metric value/);
+});

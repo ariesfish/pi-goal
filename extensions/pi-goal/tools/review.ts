@@ -68,6 +68,7 @@ export function registerReviewGoalTool(pi: ExtensionAPI, deps: ReviewGoalToolDep
           review: review.review,
         });
         if (journalError) return textToolResult(journalError);
+        runtime.state.reviews.push(review.review);
 
         deps.updateWidget(ctx);
         deps.broadcastDashboardUpdate(workDir);
