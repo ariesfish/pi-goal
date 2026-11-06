@@ -1,7 +1,7 @@
 import { buildResearchSummaryFromState } from "../domain/research-summary.ts";
 import type { AppliedRunResult, LogRunParams } from "../domain/run-result.ts";
 import type { ASI, ResearchState } from "../domain/research-state.ts";
-import { formatMetricValue } from "./metric-format.ts";
+import { formatMetricValue } from "../support/metric-format.ts";
 
 export function formatLogSummary(options: {
   state: ResearchState;

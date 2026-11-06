@@ -8,7 +8,7 @@ import {
   joinPartsToWidth,
   truncateDisplayText,
 } from "./tui-layout.ts";
-import { formatMetricValue } from "./metric-format.ts";
+import { formatDeltaPercent, formatDeltaSuffix, formatMetricValue } from "../support/metric-format.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { buildResearchSummaryFromState, isBetterMetric } from "../domain/research-summary.ts";
 import { blockingCriteriaProgress } from "../domain/goal-contract.ts";
@@ -131,12 +131,10 @@ export function createWidgetController(options: {
           if (checksFailed > 0) optional.push(theme.fg("error", ` ${checksFailed}⚠`));
 
           if (best?.deltaPercent !== null && best?.deltaPercent !== undefined && baseline) {
-            const pct = best.deltaPercent;
-            const sign = pct > 0 ? "+" : "";
             const deltaColor = isBetterMetric(best.metric, baseline.metric, state.bestDirection)
               ? "success"
               : "error";
-            optional.push(theme.fg(deltaColor, ` (${sign}${pct.toFixed(1)}%)`));
+            optional.push(theme.fg(deltaColor, formatDeltaSuffix(best.deltaPercent)));
           }
 
           if (state.confidence !== null) {
@@ -154,9 +152,7 @@ export function createWidgetController(options: {
               let secText = `${sm.name}: ${formatMetricValue(val, sm.unit)}`;
               if (bv !== undefined && bv !== 0 && val !== bv) {
                 const p = ((val - bv) / bv) * 100;
-                const s = p > 0 ? "+" : "";
-                const c = val <= bv ? "success" : "error";
-                secText += theme.fg(c, ` ${s}${p.toFixed(1)}%`);
+                secText += theme.fg(val <= bv ? "success" : "error", ` ${formatDeltaPercent(p)}`);
               }
               optional.push(theme.fg("dim", "  "));
               optional.push(theme.fg("muted", secText));

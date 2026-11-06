@@ -6,7 +6,7 @@ import {
   textToolResult,
   type ResearchToolPort,
 } from "./tool-adapter.ts";
-import { formatMetricValue } from "../ui/metric-format.ts";
+import { formatMetricValue } from "../support/metric-format.ts";
 import { buildResearchSnapshot } from "../domain/research-snapshot.ts";
 
 import type { LogDetails } from "../support/runtime.ts";

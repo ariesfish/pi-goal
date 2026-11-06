@@ -2,7 +2,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 import { appendRightAlignedAdaptiveHint } from "./tui-layout.ts";
-import { formatMetricValue } from "./metric-format.ts";
+import { formatDeltaPercent, formatDeltaSuffix, formatMetricValue } from "../support/metric-format.ts";
 import type { ResearchState } from "../domain/research-state.ts";
 import {
   buildResearchSummaryFromState,
@@ -79,10 +79,8 @@ export function renderDashboardLines(
     let progressLine = `  ${th.fg("muted", "Progress:")} ${th.fg("warning", th.bold(`★ ${st.metricName}: ${formatMetricValue(best.metric, st.metricUnit)}`))}${th.fg("dim", ` #${best.runNumber}`)}`;
 
     if (best.deltaPercent !== null && baseline !== null) {
-      const pct = best.deltaPercent;
-      const sign = pct > 0 ? "+" : "";
       const color = isBetterMetric(best.metric, baseline.metric, st.bestDirection) ? "success" : "error";
-      progressLine += th.fg(color, ` (${sign}${pct.toFixed(1)}%)`);
+      progressLine += th.fg(color, formatDeltaSuffix(best.deltaPercent));
     }
 
     lines.push(truncateToWidth(progressLine, width));
@@ -101,9 +99,7 @@ export function renderDashboardLines(
           let part = th.fg("muted", `${sm.name}: ${formatMetricValue(val, sm.unit)}`);
           if (bv !== undefined && bv !== 0 && val !== bv) {
             const p = ((val - bv) / bv) * 100;
-            const s = p > 0 ? "+" : "";
-            const c = val <= bv ? "success" : "error";
-            part += th.fg(c, ` ${s}${p.toFixed(1)}%`);
+            part += th.fg(val <= bv ? "success" : "error", ` ${formatDeltaPercent(p)}`);
           }
           secParts.push(part);
         }

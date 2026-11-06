@@ -18,6 +18,7 @@ import {
   type ResearchSummary,
   type ResearchRunSummary,
 } from "../domain/research-summary.ts";
+import { formatDeltaSuffix, formatPlainMetric } from "./metric-format.ts";
 
 const RECENT_RUN_LIMIT = 50;
 
@@ -177,14 +178,14 @@ function baselineAndBestLines(model: ResearchSummary): string[] {
   const best = model.currentExperiment.best;
   if (best && best.runNumber !== baseline.runNumber) {
     lines.push(
-      `Best     (#${best.runNumber}): ${formatMetricWithUnit(best.metric, model.metricUnit)}${formatDeltaPercent(best.deltaPercent)}`,
+      `Best     (#${best.runNumber}): ${formatMetricWithUnit(best.metric, model.metricUnit)}${formatDeltaSuffix(best.deltaPercent)}`,
     );
   }
   return lines;
 }
 
 function formatMetricWithUnit(value: number, unit: string): string {
-  return `${formatMetric(value)}${unit}`;
+  return `${formatPlainMetric(value)}${unit}`;
 }
 
 function rulesSection(mdPath: string): string {
@@ -236,7 +237,7 @@ function nextStepSection(phase: ResearchPhase): string {
 // ---------------------------------------------------------------------------
 
 function formatRunLine(run: ResearchRunSummary): string {
-  const head = `#${run.runNumber} ${padStatus(run.status)} ${formatMetric(run.metric)}${formatDeltaPercent(run.deltaPercent)}`;
+  const head = `#${run.runNumber} ${padStatus(run.status)} ${formatPlainMetric(run.metric)}${formatDeltaSuffix(run.deltaPercent)}`;
   const parts = [head, formatDescription(run), ...formatAsiFields(run.asi)];
   return parts.filter(Boolean).join(" | ");
 }
@@ -246,18 +247,6 @@ function padStatus(status: ResearchRunSummary["status"]): string {
 }
 
 const STATUS_WIDTH = "checks_failed".length;
-
-function formatMetric(value: number): string {
-  if (!Number.isFinite(value)) return "—";
-  if (Number.isInteger(value)) return String(value);
-  return value.toFixed(2);
-}
-
-function formatDeltaPercent(pct: number | null): string {
-  if (pct === null) return "";
-  const sign = pct > 0 ? "+" : "";
-  return ` (${sign}${pct.toFixed(1)}%)`;
-}
 
 function formatDescription(run: ResearchRunSummary): string {
   return run.description ? `desc: ${run.description}` : "";
