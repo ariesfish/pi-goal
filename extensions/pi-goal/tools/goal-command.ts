@@ -1,13 +1,13 @@
-import * as fs from "node:fs";
-
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+
+import { parseGoalIntent } from "./goal-intent.ts";
 
 import { createResearchState } from "../domain/research-state.ts";
 import { buildResearchSnapshot } from "../domain/research-snapshot.ts";
 import { resolveResearchToolContext, type ResearchToolPort } from "./tool-adapter.ts";
 import { readResearchFileContract } from "../persistence/research-files.ts";
-import { appendJournalEntry, policyJournalEntry, readLastRunResult } from "../persistence/research-journal.ts";
-import { activeResearch, selectActiveResearch } from "../persistence/research-directory.ts";
+import { appendJournalEntry, deleteJournal, policyJournalEntry, readLastRunResult } from "../persistence/research-journal.ts";
+import { selectActiveResearch } from "../persistence/research-directory.ts";
 import { deactivateResearch, type ResearchProtocolOptions } from "../protocol/research-phase.ts";
 import { startResearchActivation } from "../protocol/research-protocol.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
@@ -35,60 +35,51 @@ async function handleGoalCommand(
   ctx: ExtensionContext,
 ): Promise<void> {
   const runtime = deps.getRuntime(ctx);
-  const trimmedArgs = (args ?? "").trim();
-  const command = trimmedArgs.toLowerCase();
+  const intent = parseGoalIntent(args);
 
-  if (!trimmedArgs) {
-    ctx.ui.notify(goalCommandHelp(), "info");
-    return;
-  }
-
-  if (command === "off") {
-    turnResearchOff(ctx, deps, runtime);
-    return;
-  }
-
-  if (command === "allow-tests" || command === "protect-tests") {
-    toggleTestEdits(pi, ctx, deps, runtime, command === "allow-tests");
-    return;
-  }
-
-  if (command === "allow-benchmark" || command === "protect-benchmark") {
-    toggleBenchmarkEdits(pi, ctx, deps, runtime, command === "allow-benchmark");
-    return;
-  }
-
-  if (command === "export") {
-    const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
-    if (!contextResult.ok) {
-      ctx.ui.notify(contextResult.text.replace(/^❌\s*/, ""), "error");
+  switch (intent.kind) {
+    case "help":
+      ctx.ui.notify(goalCommandHelp(), "info");
+      return;
+    case "off":
+      turnResearchOff(ctx, deps, runtime);
+      return;
+    case "clear":
+      clearActiveResearchJournal(ctx, deps, runtime);
+      return;
+    case "export": {
+      const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
+      if (!contextResult.ok) {
+        ctx.ui.notify(contextResult.text.replace(/^❌\s*/, ""), "error");
+        return;
+      }
+      await deps.exportDashboard(ctx, contextResult.context.workDir);
       return;
     }
-    await deps.exportDashboard(ctx, contextResult.context.workDir);
-    return;
+    case "reinit":
+      requestExperimentStart(pi, ctx, deps, runtime);
+      return;
+    case "select-usage":
+      ctx.ui.notify("Usage: /goal select <research-id>", "info");
+      return;
+    case "select":
+      selectResearch(ctx, deps, intent.researchId);
+      return;
+    case "allow-tests":
+      toggleTestEdits(ctx, deps, runtime, true);
+      return;
+    case "protect-tests":
+      toggleTestEdits(ctx, deps, runtime, false);
+      return;
+    case "allow-benchmark":
+      toggleBenchmarkEdits(ctx, deps, runtime, true);
+      return;
+    case "protect-benchmark":
+      toggleBenchmarkEdits(ctx, deps, runtime, false);
+      return;
+    case "start":
+      await startOrResumeResearch(pi, deps, ctx, runtime, intent.goal);
   }
-
-  if (command === "select") {
-    ctx.ui.notify("Usage: /goal select <research-id>", "info");
-    return;
-  }
-
-  if (command.startsWith("select ")) {
-    selectResearch(ctx, deps, trimmedArgs);
-    return;
-  }
-
-  if (command === "reinit") {
-    requestExperimentStart(pi, ctx, deps, runtime);
-    return;
-  }
-
-  if (command === "clear") {
-    clearActiveResearchJournal(ctx, deps, runtime);
-    return;
-  }
-
-  await startOrResumeResearch(pi, deps, ctx, runtime, trimmedArgs);
 }
 
 function goalCommandHelp(): string {
@@ -130,15 +121,10 @@ function turnResearchOff(ctx: ExtensionContext, deps: GoalCommandDeps, runtime: 
   );
 }
 
-function selectResearch(ctx: ExtensionContext, deps: GoalCommandDeps, trimmedArgs: string): void {
+function selectResearch(ctx: ExtensionContext, deps: GoalCommandDeps, researchId: string): void {
   const contextResult = resolveResearchToolContext(ctx, deps.getRuntime);
   if (!contextResult.ok) {
     ctx.ui.notify(contextResult.text.replace(/^❌\s*/, ""), "error");
-    return;
-  }
-  const researchId = trimmedArgs.slice("select".length).trim();
-  if (!researchId) {
-    ctx.ui.notify("Usage: /goal select <research-id>", "info");
     return;
   }
   const selectedResearch = selectActiveResearch(contextResult.context.workDir, researchId);
@@ -164,7 +150,6 @@ function requestExperimentStart(
 }
 
 function toggleTestEdits(
-  pi: ExtensionAPI,
   ctx: ExtensionContext,
   deps: GoalCommandDeps,
   runtime: SessionRuntime,
@@ -197,7 +182,6 @@ function toggleTestEdits(
 }
 
 function toggleBenchmarkEdits(
-  pi: ExtensionAPI,
   ctx: ExtensionContext,
   deps: GoalCommandDeps,
   runtime: SessionRuntime,
@@ -243,7 +227,6 @@ function clearActiveResearchJournal(ctx: ExtensionContext, deps: GoalCommandDeps
     ctx.ui.notify(contextResult.text.replace(/^❌\s*/, ""), "error");
     return;
   }
-  const jsonlPath = activeResearch(contextResult.context.workDir).paths.journal;
   deactivateResearch(runtime.loop);
   runtime.dashboardExpanded = false;
   runtime.lastRunChecks = null;
@@ -252,19 +235,15 @@ function clearActiveResearchJournal(ctx: ExtensionContext, deps: GoalCommandDeps
   deps.stopDashboardServer();
   deps.researchChanged(ctx, contextResult.context.workDir);
 
-  if (fs.existsSync(jsonlPath)) {
-    try {
-      fs.unlinkSync(jsonlPath);
-      ctx.ui.notify("Deleted goal.jsonl and turned goal mode OFF", "info");
-    } catch (error) {
-      ctx.ui.notify(
-        `Failed to delete goal.jsonl: ${error instanceof Error ? error.message : String(error)}`,
-        "error",
-      );
-    }
-  } else {
-    ctx.ui.notify("No goal.jsonl found. Research mode OFF", "info");
+  const removal = deleteJournal(contextResult.context.workDir);
+  if (removal.error) {
+    ctx.ui.notify(`Failed to delete goal.jsonl: ${removal.error}`, "error");
+    return;
   }
+  ctx.ui.notify(
+    removal.deleted ? "Deleted goal.jsonl and turned goal mode OFF" : "No goal.jsonl found. Research mode OFF",
+    "info",
+  );
 }
 
 async function startOrResumeResearch(

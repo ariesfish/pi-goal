@@ -97,6 +97,19 @@ function journalWriteError(error: unknown): string {
   return `⚠️ Failed to write goal.jsonl: ${error instanceof Error ? error.message : String(error)}`;
 }
 
+/** Remove the journal of the active research (the `/goal clear` action). */
+export function deleteJournal(workDir: string): { deleted: boolean; error: string | null } {
+  const journalPath = activeResearch(workDir).paths.journal;
+  if (!fs.existsSync(journalPath)) return { deleted: false, error: null };
+  try {
+    fs.unlinkSync(journalPath);
+    snapshotCache.delete(journalPath);
+    return { deleted: true, error: null };
+  } catch (error) {
+    return { deleted: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 export function appendJournalEntry(workDir: string, entry: object): string | null {
   return appendLine(workDir, JSON.stringify(entry));
 }
