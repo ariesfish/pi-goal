@@ -14,94 +14,20 @@ import { registerReviewGoalTool } from "../../extensions/pi-goal/tools/review.ts
 import { registerRunExperimentTool } from "../../extensions/pi-goal/tools/run.ts";
 import { registerValidateResearchTool } from "../../extensions/pi-goal/tools/validate.ts";
 import { tempProject } from "../helpers/research-fixture.mjs";
+import { fakeCtx, fakePi, fakePort, loopOptions, resultText, runTool } from "../helpers/fake-host.mjs";
 
-const loopOptions = {
-  maxAutoResumeTurns: 20,
-  maxActivationTurns: 3,
-  benchmarkGuardrail: "Do not cheat.",
-};
-
-/** Minimal stand-in for ExtensionAPI: records what a registration does. */
-function fakePi() {
-  const tools = new Map();
-  const commands = new Map();
-  const userMessages = [];
-  return {
-    tools,
-    commands,
-    userMessages,
-    registerTool(definition) {
-      tools.set(definition.name, definition);
-      return definition;
-    },
-    registerCommand(name, definition) {
-      commands.set(name, definition);
-      return definition;
-    },
-    on() {},
-    registerShortcut() {},
-    sendUserMessage(message) {
-      userMessages.push(message);
-    },
-    async exec() {
-      return { code: 0, stdout: "", stderr: "" };
-    },
-  };
-}
-
-/** Minimal stand-in for ExtensionContext. */
-function fakeCtx(cwd, options = {}) {
-  const notices = [];
-  return {
-    notices,
-    cwd,
-    hasUI: options.hasUI ?? false,
-    isIdle: () => options.idle ?? true,
-    abort() {},
-    ui: {
-      notify(message, level) {
-        notices.push({ message, level });
-      },
-      async confirm() {
-        return true;
-      },
-      setWidget() {},
-    },
-    sessionManager: {
-      getSessionId: () => options.sessionId ?? "session-1",
-      getBranch: () => [],
-    },
-  };
-}
-
-/** The host port a registration needs, with the view announcement recorded. */
-function fakePort(runtime = createSessionRuntime()) {
-  const changes = [];
-  const port = {
-    changes,
-    getRuntime: () => runtime,
-    researchChanged(_ctx, workDir) {
-      changes.push(workDir);
-    },
-    exec: {
-      async exec() {
-        return { code: 0, stdout: "", stderr: "" };
-      },
-    },
-    async fireHook() {
-      return null;
-    },
-  };
-  return port;
-}
-
-function run(tool, params, ctx) {
-  return tool.execute("call-1", params, undefined, () => {}, ctx);
-}
-
-function resultText(result) {
-  return result.content[0].text;
-}
+const TOOL_NAMES = [
+  "check_goal",
+  "frame_goal",
+  "freeze_criteria",
+  "init_goal",
+  "log_goal",
+  "probe_goal",
+  "review_goal",
+  "run_goal",
+  "start_goal",
+  "validate_goal",
+];
 
 function registerAll(pi, port) {
   registerValidateResearchTool(pi);
@@ -121,19 +47,6 @@ function registerAll(pi, port) {
     loopOptions,
   });
 }
-
-const TOOL_NAMES = [
-  "check_goal",
-  "frame_goal",
-  "freeze_criteria",
-  "init_goal",
-  "log_goal",
-  "probe_goal",
-  "review_goal",
-  "run_goal",
-  "start_goal",
-  "validate_goal",
-];
 
 test("every tool and the /goal command register their public name", () => {
   const pi = fakePi();
@@ -166,7 +79,7 @@ test("validate_goal reports a broken workingDir before touching the workspace", 
     const pi = fakePi();
     registerAll(pi, fakePort());
 
-    const result = await run(pi.tools.get("validate_goal"), {}, fakeCtx(projectDir));
+    const result = await runTool(pi.tools.get("validate_goal"), {}, fakeCtx(projectDir));
 
     assert.match(resultText(result), /workingDir .* does not exist/);
   } finally {
@@ -181,7 +94,7 @@ test("check_goal refuses to run without a frozen contract", async () => {
     const port = fakePort();
     registerAll(pi, port);
 
-    const result = await run(pi.tools.get("check_goal"), {}, fakeCtx(projectDir));
+    const result = await runTool(pi.tools.get("check_goal"), {}, fakeCtx(projectDir));
 
     assert.match(resultText(result), /No frozen contract/);
     assert.deepEqual(port.changes, []);
@@ -208,7 +121,7 @@ test("review_goal explains how to configure a reviewer", async () => {
     const port = fakePort(runtime);
     registerAll(pi, port);
 
-    const result = await run(pi.tools.get("review_goal"), {}, fakeCtx(projectDir));
+    const result = await runTool(pi.tools.get("review_goal"), {}, fakeCtx(projectDir));
 
     assert.match(resultText(result), /No reviewer configured/);
   } finally {
@@ -224,7 +137,7 @@ test("frame_goal is refused outside the framing phase", async () => {
     const pi = fakePi();
     registerAll(pi, fakePort(runtime));
 
-    const result = await run(pi.tools.get("frame_goal"), {
+    const result = await runTool(pi.tools.get("frame_goal"), {
       directions: [
         {
           id: "D1",
@@ -263,7 +176,7 @@ test("run_goal blocks at the experiment run limit", async () => {
     const port = fakePort(runtime);
     registerAll(pi, port);
 
-    const result = await run(pi.tools.get("run_goal"), { command: "bash goal.sh" }, fakeCtx(projectDir));
+    const result = await runTool(pi.tools.get("run_goal"), { command: "bash goal.sh" }, fakeCtx(projectDir));
 
     assert.match(resultText(result), /Maximum runs reached/);
     assert.deepEqual(port.changes, []);
@@ -291,7 +204,7 @@ test("run_goal is blocked while a previous run awaits its log", async () => {
     const pi = fakePi();
     registerAll(pi, fakePort(runtime));
 
-    const result = await run(pi.tools.get("run_goal"), { command: "bash goal.sh" }, fakeCtx(projectDir));
+    const result = await runTool(pi.tools.get("run_goal"), { command: "bash goal.sh" }, fakeCtx(projectDir));
 
     assert.match(resultText(result), /Previous run_goal has not been logged/);
   } finally {
@@ -311,7 +224,7 @@ test("log_goal records the run and announces one research change", async () => {
     const port = fakePort(runtime);
     registerAll(pi, port);
 
-    const result = await run(pi.tools.get("log_goal"), {
+    const result = await runTool(pi.tools.get("log_goal"), {
       commit: "pending",
       metric: 100,
       status: "discard",
