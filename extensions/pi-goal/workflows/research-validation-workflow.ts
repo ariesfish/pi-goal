@@ -3,10 +3,11 @@ import {
   type ResearchValidationIssue,
   type ResearchValidationResult,
 } from "../domain/research-validation.ts";
-import { validateResearchDryRun, type ResearchDryRunExecAdapter } from "../execution/research-dry-run.ts";
+import { validateResearchDryRun } from "../execution/research-dry-run.ts";
+import type { HostExec } from "../support/exec.ts";
 import { validateResearchFiles } from "../persistence/research-files.ts";
 
-export type ValidatorExecAdapter = ResearchDryRunExecAdapter;
+export type ValidatorExecAdapter = HostExec;
 export type { ResearchValidationIssue, ResearchValidationResult };
 
 export async function validateResearch(options: {

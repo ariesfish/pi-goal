@@ -1,14 +1,14 @@
 import type { Attempt } from "../domain/goal-contract.ts";
+import type { HostExec } from "../support/exec.ts";
 import {
   commitKeptRunResult,
   restoreRejectedRunResult,
-  type WorkspaceExecAdapter,
 } from "./research-workspace.ts";
 
 export type SettledRunStatus = "keep" | "discard" | "crash" | "checks_failed";
 
 export interface RunWorkspaceSettlementOptions {
-  pi: WorkspaceExecAdapter;
+  pi: HostExec;
   workDir: string;
   /** Where reverted-attempt patches are written. */
   attemptsDir: string;

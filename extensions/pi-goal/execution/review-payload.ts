@@ -4,14 +4,7 @@ import * as path from "node:path";
 import type { GateResult, GoalContract } from "../domain/goal-contract.ts";
 import type { ResearchState } from "../domain/research-state.ts";
 import { isResearchStatePath } from "../persistence/research-directory.ts";
-
-export interface ReviewExecAdapter {
-  exec(
-    command: string,
-    args: string[],
-    options: { cwd?: string; timeout?: number },
-  ): Promise<{ code: number | null; stdout: string; stderr: string }>;
-}
+import type { HostExec } from "../support/exec.ts";
 
 export interface ReviewPayload {
   version: 1;
@@ -31,7 +24,7 @@ const MAX_UNTRACKED_BYTES = 200_000;
 const MAX_UNTRACKED_FILE_BYTES = 60_000;
 
 export async function buildReviewPayload(options: {
-  pi: ReviewExecAdapter;
+  pi: HostExec;
   workDir: string;
   contract: GoalContract;
   state: ResearchState;
@@ -53,7 +46,7 @@ export async function buildReviewPayload(options: {
 }
 
 async function readCandidateChanges(
-  pi: ReviewExecAdapter,
+  pi: HostExec,
   workDir: string,
 ): Promise<{ diff: string; untracked: Array<Record<string, unknown>>; diffTruncated: boolean }> {
   let diff = "";

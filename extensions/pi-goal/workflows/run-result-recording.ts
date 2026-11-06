@@ -15,7 +15,7 @@ import type { HookPayload } from "../execution/hooks.ts";
 import { onResearchRunLogged } from "../protocol/research-phase.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { formatLogSummary } from "../ui/log-result-renderer.ts";
-import type { WorkspaceExecAdapter } from "../workspace/research-workspace.ts";
+import type { HostExec } from "../support/exec.ts";
 import {
   settleRunWorkspace,
   type RunWorkspaceSettlement,
@@ -36,7 +36,7 @@ import { gatePassed, recordGate } from "./gate-workflow.ts";
 import { recordReview } from "./review-workflow.ts";
 
 export interface RecordRunResultDeps {
-  pi: WorkspaceExecAdapter;
+  pi: HostExec;
   workDir: string;
   /** Where goal.config.json lives; defaults to workDir. */
   configDir?: string;

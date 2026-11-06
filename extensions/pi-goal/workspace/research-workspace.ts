@@ -3,14 +3,8 @@ import * as path from "node:path";
 
 import { isResearchStatePath } from "../persistence/research-directory.ts";
 import type { Attempt } from "../domain/goal-contract.ts";
+import type { HostExec } from "../support/exec.ts";
 
-export interface WorkspaceExecAdapter {
-  exec(command: string, args: string[], options: { cwd?: string; timeout?: number }): Promise<{
-    code: number | null;
-    stdout: string;
-    stderr: string;
-  }>;
-}
 
 export interface ResearchWorkspaceCheck {
   clean: boolean;
@@ -21,7 +15,7 @@ export interface ResearchWorkspaceCheck {
 }
 
 export interface CommitKeptRunResultOptions {
-  pi: WorkspaceExecAdapter;
+  pi: HostExec;
   workDir: string;
   description: string;
   metricName: string;
@@ -38,7 +32,7 @@ export interface CommitKeptRunResult {
 }
 
 export async function checkResearchWorkspace(
-  pi: WorkspaceExecAdapter,
+  pi: HostExec,
   cwd: string,
 ): Promise<ResearchWorkspaceCheck> {
   try {
@@ -152,7 +146,7 @@ export interface RestoreRejectedRunResult {
 }
 
 export async function restoreRejectedRunResult(options: {
-  pi: WorkspaceExecAdapter;
+  pi: HostExec;
   workDir: string;
   status: "discard" | "crash" | "checks_failed";
   runNumber: number;
@@ -194,7 +188,7 @@ export async function restoreRejectedRunResult(options: {
 }
 
 export async function readCheckpoint(
-  pi: WorkspaceExecAdapter,
+  pi: HostExec,
   workDir: string,
 ): Promise<string> {
   try {

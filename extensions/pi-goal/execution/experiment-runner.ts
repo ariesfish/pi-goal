@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 
 import { truncateTail, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
 
+import type { HostExec } from "../support/exec.ts";
 import { runChecks } from "./checks-runner.ts";
 import { runShellCommand } from "./shell-command-runner.ts";
 
@@ -14,20 +15,6 @@ export const EXPERIMENT_MAX_BYTES = 4 * 1024;
 const METRIC_LINE_PREFIX = "METRIC";
 const DENIED_METRIC_NAMES = new Set(["__proto__", "constructor", "prototype"]);
 
-export interface ExperimentRunnerExecResult {
-  code: number | null;
-  killed?: boolean;
-  stdout: string;
-  stderr: string;
-}
-
-export interface ExperimentRunnerPiAdapter {
-  exec(
-    command: string,
-    args: string[],
-    options: { signal?: AbortSignal; timeout?: number; cwd?: string },
-  ): Promise<ExperimentRunnerExecResult>;
-}
 
 export interface ExperimentRunUpdate {
   content: [{ type: "text"; text: string }];
@@ -48,7 +35,7 @@ export interface RunExperimentOptions {
   metricUnit: string;
   signal?: AbortSignal;
   onUpdate?: (update: ExperimentRunUpdate) => void;
-  pi: ExperimentRunnerPiAdapter;
+  pi: HostExec;
 }
 
 export interface RunDetails {

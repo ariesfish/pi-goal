@@ -4,17 +4,15 @@ import type {
   ReviewResult,
 } from "../domain/goal-contract.ts";
 import type { ResearchState } from "../domain/research-state.ts";
-import {
-  buildReviewPayload,
-  type ReviewExecAdapter,
-} from "../execution/review-payload.ts";
+import { buildReviewPayload } from "../execution/review-payload.ts";
 import { createReviewAdapter, type PiCommand } from "../execution/review-adapter.ts";
 import { appendJournalEntry } from "../persistence/research-journal.ts";
 import { checkResearchWorkspace } from "../workspace/research-workspace.ts";
+import type { HostExec } from "../support/exec.ts";
 import type { ReviewerConfig } from "../persistence/goal-config.ts";
 
 export interface ReviewWorkflowOptions {
-  pi: ReviewExecAdapter;
+  pi: HostExec;
   workDir: string;
   contract: GoalContract;
   state: ResearchState;
@@ -38,7 +36,7 @@ export interface ReviewWorkflowResult {
 }
 
 export interface RecordReviewOptions {
-  pi: ReviewExecAdapter;
+  pi: HostExec;
   workDir: string;
   contract: GoalContract;
   state: ResearchState;
@@ -125,7 +123,7 @@ export async function recordReview(options: RecordReviewOptions): Promise<Review
 async function verifyFinding(
   finding: ReviewFinding,
   workDir: string,
-  pi: ReviewExecAdapter,
+  pi: HostExec,
 ): Promise<ReviewFinding> {
   if (!finding.repro) return { ...finding, reproduced: false };
 

@@ -9,14 +9,8 @@ import {
   researchValidationError,
   type ResearchValidationIssue,
 } from "../domain/research-validation.ts";
+import type { HostExec } from "../support/exec.ts";
 
-export interface ResearchDryRunExecAdapter {
-  exec(
-    command: string,
-    args: string[],
-    options: { cwd?: string; timeout?: number },
-  ): Promise<{ code: number | null; killed?: boolean; stdout: string; stderr: string }>;
-}
 
 export interface ResearchDryRunValidationResult {
   issues: ResearchValidationIssue[];
@@ -25,7 +19,7 @@ export interface ResearchDryRunValidationResult {
 
 export async function validateResearchDryRun(options: {
   workDir: string;
-  pi: ResearchDryRunExecAdapter;
+  pi: HostExec;
   contract: ResearchFileContract;
   metricName: string | null;
   dryRun: boolean;

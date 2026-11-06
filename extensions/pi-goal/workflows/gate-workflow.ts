@@ -2,13 +2,11 @@ import type { GateResult, GoalContract } from "../domain/goal-contract.ts";
 import type { ResearchState } from "../domain/research-state.ts";
 import { gateJournalEntry, runGate } from "../execution/gate-runner.ts";
 import { appendJournalEntry } from "../persistence/research-journal.ts";
-import {
-  checkResearchWorkspace,
-  type WorkspaceExecAdapter,
-} from "../workspace/research-workspace.ts";
+import { checkResearchWorkspace } from "../workspace/research-workspace.ts";
+import type { HostExec } from "../support/exec.ts";
 
 export interface RecordGateOptions {
-  pi: WorkspaceExecAdapter;
+  pi: HostExec;
   workDir: string;
   contract: GoalContract;
   state: ResearchState;

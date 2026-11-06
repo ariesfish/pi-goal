@@ -5,18 +5,11 @@ import {
   type GoalContract,
 } from "../domain/goal-contract.ts";
 import { currentRuns, type ResearchState } from "../domain/research-state.ts";
+import type { HostExec } from "../support/exec.ts";
 import { matchGlob } from "../support/glob.ts";
 
-export interface GateExecAdapter {
-  exec(
-    command: string,
-    args: string[],
-    options: { cwd?: string; timeout?: number },
-  ): Promise<{ code: number | null; stdout: string; stderr: string }>;
-}
-
 export interface GateOptions {
-  pi: GateExecAdapter;
+  pi: HostExec;
   workDir: string;
   contract: GoalContract;
   state: ResearchState;

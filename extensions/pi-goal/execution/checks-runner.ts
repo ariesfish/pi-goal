@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import type { ExperimentRunnerPiAdapter } from "./experiment-runner.ts";
+import type { HostExec } from "../support/exec.ts";
 import { activeResearch, resolveResearchFilePath } from "../persistence/research-directory.ts";
 
 export interface ChecksRunResult {
@@ -16,7 +16,7 @@ export async function runChecks(options: {
   benchmarkPassed: boolean;
   checksTimeoutSeconds?: number;
   signal?: AbortSignal;
-  pi: ExperimentRunnerPiAdapter;
+  pi: HostExec;
 }): Promise<ChecksRunResult> {
   let pass: boolean | null = null;
   let timedOut = false;

@@ -22,6 +22,7 @@ import {
 import type { ResearchState } from "../domain/research-state.ts";
 import { parseMetricLines } from "../execution/experiment-runner.ts";
 import { runShellCommand } from "../execution/shell-command-runner.ts";
+import type { HostExec } from "../support/exec.ts";
 import {
   appendJournalEntry,
   contractJournalEntry,
@@ -96,7 +97,7 @@ export interface GoalWorkflowDeps {
   runtime: SessionRuntime;
   workDir: string;
   confirm(message: string): Promise<boolean>;
-  exec?: { exec(command: string, args: string[], options: { cwd?: string; timeout?: number }): Promise<{ code: number | null; stdout: string; stderr: string }> };
+  exec?: HostExec;
 }
 
 export type GoalContractWorkflowResult =
