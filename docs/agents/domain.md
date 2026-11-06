@@ -18,7 +18,9 @@ This is a single-context repo:
 ├── CONTEXT.md
 ├── docs/adr/
 │   ├── 0001-research-identity-and-active-research.md
-│   └── 0002-split-research-initialization-from-experiment-start.md
+│   ├── 0002-split-research-initialization-from-experiment-start.md
+│   ├── 0003-phased-goal-protocol.md
+│   └── 0004-keep-hand-written-journal-validation.md
 └── skills/
 ```
 
