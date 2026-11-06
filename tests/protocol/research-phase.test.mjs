@@ -141,3 +141,70 @@ test("system prompt injects phase-specific required action", () => {
   assert.match(prompt, /Backpressure Checks/);
   assert.match(prompt, /Ideas backlog/);
 });
+
+const DIRECTION = {
+  id: "D1",
+  title: "cache hot paths",
+  mechanism: "memoize",
+  proxyMetric: "hits",
+  cost: "1h",
+  risk: "stale reads",
+  killIf: "hit rate < 10%",
+  status: "open",
+};
+
+const CLOSED = {
+  ...DIRECTION,
+  status: "kept",
+  evidence: { command: "probe", value: 42, outputHash: "sha256:abc", at: 1 },
+};
+
+const SEALABLE_CONTRACT = {
+  version: 1,
+  objective: "cut test time",
+  criteria: [
+    {
+      id: "C1",
+      statement: "suite faster",
+      kind: "metric",
+      blocking: true,
+      metric: { name: "total_ms", direction: "lower" },
+    },
+  ],
+  testGlobs: [],
+  scopeGlobs: [],
+  allowTestEdits: false,
+  frozenAt: 1,
+  hash: "sha256:test",
+};
+
+test("a setup epoch resets the activation budget; phases inside one keep counting", async () => {
+  const {
+    enterResearchProbing,
+    enterResearchConverging,
+    sealResearchContract,
+    markResearchAutoResumeSent,
+  } = await import("../../extensions/pi-goal/protocol/research-phase.ts");
+
+  const state = createResearchPhaseState();
+  activateResearch(state, {
+    userGoal: "optimize tests",
+    hasRules: false,
+    hasConfig: false,
+    hasBenchmarkScript: false,
+  }, options);
+
+  markResearchAutoResumeSent(state);
+  markResearchAutoResumeSent(state);
+  assert.equal(state.activationTurns, 2);
+
+  assert.equal(enterResearchProbing(state, [DIRECTION, { ...DIRECTION, id: "D2" }]).ok, true);
+  assert.equal(state.activationTurns, 2);
+
+  assert.equal(enterResearchConverging(state, [CLOSED, { ...CLOSED, id: "D2" }]).ok, true);
+  assert.equal(state.activationTurns, 2);
+
+  // Sealing starts a new setup epoch.
+  assert.equal(sealResearchContract(state, SEALABLE_CONTRACT, { hasBaseline: true }).ok, true);
+  assert.equal(state.activationTurns, 0);
+});
