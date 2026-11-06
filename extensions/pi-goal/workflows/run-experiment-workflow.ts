@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { findBestMetric } from "../domain/research-state.ts";
-import { currentRuns, type ResearchState } from "../domain/research-state.ts";
+import { currentRuns } from "../domain/research-state.ts";
 import {
   isGoalShCommand,
   runExperiment,

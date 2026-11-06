@@ -5,7 +5,6 @@ import {
   detectPreContractPhase,
   enterResearchSealed,
   enterResearchNeedsInitFromFiles,
-  shouldResearchAutoResumeAfterTurn,
   researchPhaseSystemPromptFor,
   type ResearchProtocolOptions,
   type ResearchPhaseState,

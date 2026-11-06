@@ -4,11 +4,7 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { appendRightAlignedAdaptiveHint } from "./tui-layout.ts";
 import { formatDeltaPercent, formatDeltaSuffix, formatMetricValue } from "../support/metric-format.ts";
 import type { ResearchState } from "../domain/research-state.ts";
-import {
-  buildResearchSummaryFromState,
-  isBetterMetric,
-  type ResearchRunSummary,
-} from "../domain/research-summary.ts";
+import { buildResearchSummaryFromState, isBetterMetric } from "../domain/research-summary.ts";
 
 // ---------------------------------------------------------------------------
 // Dashboard table renderer (pure function, no UI deps)

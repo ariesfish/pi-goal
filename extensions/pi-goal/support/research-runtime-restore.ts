@@ -2,7 +2,6 @@ import { createResearchState, cloneResearchState, computeConfidence, type Resear
 import {
   resetResearchPhaseForAgentStart,
   resetResearchResumeCounters,
-  type ResearchPhaseState,
 } from "../protocol/research-phase.ts";
 import { syncResearchPhaseFromResearchFiles } from "../protocol/research-protocol.ts";
 import type { LogDetails, SessionRuntime } from "./runtime.ts";

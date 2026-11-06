@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import {
   firstTextContent,
@@ -11,11 +11,7 @@ import { buildResearchSnapshot } from "../domain/research-snapshot.ts";
 
 import type { LogDetails } from "../support/runtime.ts";
 import { LogParams } from "../support/schema.ts";
-import {
-  cloneResearchState,
-  isBetter,
-  type ResearchState,
-} from "../domain/research-state.ts";
+import { cloneResearchState, isBetter } from "../domain/research-state.ts";
 import {
   finishRecordedRunResult,
   recordRunResult,

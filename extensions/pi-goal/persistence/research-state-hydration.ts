@@ -1,4 +1,4 @@
-import { createResearchState, type ResearchState } from "../domain/research-state.ts";
+import type { ResearchState } from "../domain/research-state.ts";
 import { legacyMetricContract } from "../domain/goal-contract.ts";
 import { parseResearchJournal, type ParsedJournal } from "./research-journal-codec.ts";
 
