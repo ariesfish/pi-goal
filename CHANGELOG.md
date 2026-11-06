@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.3] - 2026-11-06
+
+### Changed
+
+- `hasContract` in the research file contract now reports the legacy Goal Contract derived from a config header, so a journal that predates contract entries no longer reads as "no contract".
+- The journal is replayed once and reused while the file is unchanged, instead of re-parsing the whole journal on every turn.
+
+### Fixed
+
+- A kept run whose commit landed but whose journal write failed is reported with the commit hash and a `log_goal` retry instruction, instead of a bare failure that hid the commit.
+
 ## [0.5.2] - 2026-11-04
 
 ### Added
