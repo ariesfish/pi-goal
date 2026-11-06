@@ -1,0 +1,1571 @@
+{
+  "empty journal": {
+    "hasConfig": false,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": null,
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "metric",
+      "metricUnit": "",
+      "name": null,
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "whitespace only": {
+    "hasConfig": false,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": null,
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "metric",
+      "metricUnit": "",
+      "name": null,
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "malformed json line is skipped": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "",
+      "name": null,
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "non-object json lines are skipped": {
+    "hasConfig": false,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": null,
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "metric",
+      "metricUnit": "",
+      "name": null,
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "unknown entry type is ignored": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": 100,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [
+        {
+          "commit": "aaa1111",
+          "confidence": null,
+          "description": "baseline",
+          "experimentIndex": 0,
+          "metric": 100,
+          "metrics": {
+            "compile_ms": 40
+          },
+          "status": "keep",
+          "timestamp": 1
+        }
+      ],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [
+        {
+          "name": "compile_ms",
+          "unit": "ms"
+        }
+      ],
+      "testEditsAllowed": false
+    }
+  },
+  "hook entries are ignored": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": 100,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [
+        {
+          "commit": "aaa1111",
+          "confidence": null,
+          "description": "baseline",
+          "experimentIndex": 0,
+          "metric": 100,
+          "metrics": {
+            "compile_ms": 40
+          },
+          "status": "keep",
+          "timestamp": 1
+        }
+      ],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [
+        {
+          "name": "compile_ms",
+          "unit": "ms"
+        }
+      ],
+      "testEditsAllowed": false
+    }
+  },
+  "config only": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "config with missing fields": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "metric"
+            },
+            "statement": "metric improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:5cc1f21833525e59acc4c9aa60a78b5036af7d2d25ff0e7df1c49fce8a59abce",
+        "objective": "Legacy metric loop on metric",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "metric",
+      "metricUnit": "",
+      "name": null,
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "second config entry resets experiment and secondary metrics": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": 100,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 1,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [
+        {
+          "commit": "aaa1111",
+          "confidence": null,
+          "description": "baseline",
+          "experimentIndex": 0,
+          "metric": 100,
+          "metrics": {
+            "compile_ms": 40
+          },
+          "status": "keep",
+          "timestamp": 1
+        },
+        {
+          "commit": "aaa1111",
+          "confidence": null,
+          "description": "baseline",
+          "experimentIndex": 1,
+          "metric": 100,
+          "metrics": {
+            "render_ms": 2
+          },
+          "status": "keep",
+          "timestamp": 1
+        }
+      ],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [
+        {
+          "name": "render_ms",
+          "unit": "ms"
+        }
+      ],
+      "testEditsAllowed": false
+    }
+  },
+  "run status outside the enum normalizes to keep": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": 100,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [
+        {
+          "commit": "aaa1111",
+          "confidence": null,
+          "description": "baseline",
+          "experimentIndex": 0,
+          "metric": 100,
+          "metrics": {
+            "compile_ms": 40
+          },
+          "status": "keep",
+          "timestamp": 1
+        }
+      ],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [
+        {
+          "name": "compile_ms",
+          "unit": "ms"
+        }
+      ],
+      "testEditsAllowed": false
+    }
+  },
+  "bestDirection outside the enum normalizes to lower": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "run without a run number is not a run": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "run with wrong-typed fields falls back per field": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": 0,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [
+        {
+          "commit": "",
+          "confidence": null,
+          "description": "",
+          "experimentIndex": 0,
+          "metric": 0,
+          "metrics": {
+            "render_ms": 2
+          },
+          "status": "keep",
+          "timestamp": 0
+        }
+      ],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [
+        {
+          "name": "render_ms",
+          "unit": "ms"
+        }
+      ],
+      "testEditsAllowed": false
+    }
+  },
+  "run experimentIndex falls back to the running index": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": 100,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [
+        {
+          "commit": "aaa1111",
+          "confidence": null,
+          "description": "baseline",
+          "experimentIndex": 0,
+          "metric": 100,
+          "metrics": {
+            "compile_ms": 40
+          },
+          "status": "keep",
+          "timestamp": 1
+        }
+      ],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [
+        {
+          "name": "compile_ms",
+          "unit": "ms"
+        }
+      ],
+      "testEditsAllowed": false
+    }
+  },
+  "run keeps asian metric names": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": 100,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [
+        {
+          "commit": "aaa1111",
+          "confidence": null,
+          "description": "baseline",
+          "experimentIndex": 0,
+          "metric": 100,
+          "metrics": {
+            "総合_µs": 12.5
+          },
+          "status": "keep",
+          "timestamp": 1
+        }
+      ],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [
+        {
+          "name": "総合_µs",
+          "unit": "µs"
+        }
+      ],
+      "testEditsAllowed": false
+    }
+  },
+  "contract entry is kept whole": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": 100,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "C1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "suite faster"
+          },
+          {
+            "blocking": true,
+            "check": {
+              "command": "npm test",
+              "expect": "exit0"
+            },
+            "id": "C2",
+            "kind": "command",
+            "statement": "checks pass"
+          }
+        ],
+        "frozenAt": 5,
+        "hash": "sha256:contract",
+        "objective": "cut test time",
+        "scopeGlobs": [
+          "src/**"
+        ],
+        "testGlobs": [
+          "**/*.test.js"
+        ],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [
+        {
+          "commit": "aaa1111",
+          "confidence": null,
+          "description": "baseline",
+          "experimentIndex": 0,
+          "metric": 100,
+          "metrics": {
+            "compile_ms": 40
+          },
+          "status": "keep",
+          "timestamp": 1
+        }
+      ],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [
+        {
+          "name": "compile_ms",
+          "unit": "ms"
+        }
+      ],
+      "testEditsAllowed": false
+    }
+  },
+  "contract without a hash is dropped": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "contract with criteria that are not an array is dropped": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "one bad criterion drops the whole contract": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "unknown fields inside a contract are ignored": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "C1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "suite faster"
+          }
+        ],
+        "frozenAt": 5,
+        "hash": "sha256:contract",
+        "objective": "cut test time",
+        "scopeGlobs": [
+          "src/**"
+        ],
+        "testGlobs": [
+          "**/*.test.js"
+        ],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "criterion with a broken check keeps the criterion and drops the check": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "C2",
+            "kind": "command",
+            "statement": "checks pass"
+          }
+        ],
+        "frozenAt": 5,
+        "hash": "sha256:contract",
+        "objective": "cut test time",
+        "scopeGlobs": [
+          "src/**"
+        ],
+        "testGlobs": [
+          "**/*.test.js"
+        ],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "direction entries upsert by id": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [
+        {
+          "cost": "1h",
+          "evidence": {
+            "at": 2,
+            "command": "probe",
+            "outputHash": "sha256:abc",
+            "value": 11
+          },
+          "id": "D1",
+          "killIf": "hit rate < 10%",
+          "mechanism": "cache",
+          "proxyMetric": "hits",
+          "risk": "stale",
+          "status": "killed",
+          "title": "memoize"
+        }
+      ],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "direction without a status is dropped": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "probe entries are appended": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [
+        {
+          "at": 3,
+          "command": "bash probe.sh",
+          "decision": "keep",
+          "directionId": "D1",
+          "evidenceHash": "sha256:probe",
+          "value": 42
+        }
+      ],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "gate entries are appended": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [
+        {
+          "checkedAt": 4,
+          "contractHash": "sha256:contract",
+          "criteria": [
+            {
+              "blocking": true,
+              "criterionId": "C1",
+              "detail": "improved",
+              "pass": true
+            },
+            {
+              "blocking": true,
+              "criterionId": "L2-scope",
+              "detail": "inside scope",
+              "pass": true
+            }
+          ],
+          "verdict": "pass"
+        }
+      ],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "review entries are appended": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [
+        {
+          "at": 6,
+          "findings": [
+            {
+              "claim": "edge case",
+              "id": "F1",
+              "reproduced": false,
+              "severity": "advisory"
+            }
+          ],
+          "reviewer": "pi:test"
+        }
+      ],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "attempt entries are appended": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [
+        {
+          "at": 7,
+          "checkpoint": "abc1234",
+          "description": "slower",
+          "patchPath": "attempts/2.patch",
+          "run": 2,
+          "status": "discard"
+        }
+      ],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "policy entries replay in order": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": 100,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [
+        {
+          "commit": "aaa1111",
+          "confidence": null,
+          "description": "baseline",
+          "experimentIndex": 0,
+          "metric": 100,
+          "metrics": {
+            "compile_ms": 40
+          },
+          "status": "keep",
+          "timestamp": 1
+        }
+      ],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [
+        {
+          "name": "compile_ms",
+          "unit": "ms"
+        }
+      ],
+      "testEditsAllowed": false
+    }
+  },
+  "policy flags only accept a literal true": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": null,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [],
+      "testEditsAllowed": false
+    }
+  },
+  "legacy journal derives the metric contract from the config header": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": 100,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [
+        {
+          "commit": "aaa1111",
+          "confidence": null,
+          "description": "baseline",
+          "experimentIndex": 0,
+          "metric": 100,
+          "metrics": {
+            "compile_ms": 40
+          },
+          "status": "keep",
+          "timestamp": 1
+        }
+      ],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [
+        {
+          "name": "compile_ms",
+          "unit": "ms"
+        }
+      ],
+      "testEditsAllowed": false
+    }
+  },
+  "truncated json at the end is skipped": {
+    "hasConfig": true,
+    "state": {
+      "attempts": [],
+      "baselineMetric": 100,
+      "benchmarkEditsAllowed": false,
+      "bestDirection": "lower",
+      "confidence": null,
+      "contract": {
+        "allowTestEdits": false,
+        "criteria": [
+          {
+            "blocking": true,
+            "id": "M1",
+            "kind": "metric",
+            "metric": {
+              "direction": "lower",
+              "name": "total_ms"
+            },
+            "statement": "total_ms improves (lower is better)"
+          }
+        ],
+        "frozenAt": 0,
+        "hash": "sha256:3cce887fa4aeefddd79c3c087d57bf8467e14e4bf8584530d785a8a46f3f5844",
+        "objective": "Legacy metric loop on total_ms",
+        "scopeGlobs": [],
+        "testGlobs": [],
+        "version": 1
+      },
+      "currentExperimentIndex": 0,
+      "directions": [],
+      "gates": [],
+      "metricName": "total_ms",
+      "metricUnit": "ms",
+      "name": "Speed",
+      "probes": [],
+      "results": [
+        {
+          "commit": "aaa1111",
+          "confidence": null,
+          "description": "baseline",
+          "experimentIndex": 0,
+          "metric": 100,
+          "metrics": {
+            "compile_ms": 40
+          },
+          "status": "keep",
+          "timestamp": 1
+        }
+      ],
+      "reviews": [],
+      "runLimit": null,
+      "secondaryMetrics": [
+        {
+          "name": "compile_ms",
+          "unit": "ms"
+        }
+      ],
+      "testEditsAllowed": false
+    }
+  }
+}
