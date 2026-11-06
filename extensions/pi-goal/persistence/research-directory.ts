@@ -34,6 +34,24 @@ export function isResearchStatePath(filePath: string): boolean {
   return parts.length === 1 && parts[0].startsWith("goal.");
 }
 
+/**
+ * The sealed phase refuses direct writes to the paths the extension owns.
+ * Narrower than `isResearchStatePath` on purpose: `goal.md` and
+ * `goal.ideas.md` are narrative files an agent is expected to write, while the
+ * journal, the active pointer, attempts, and the config are extension-managed.
+ */
+export function isSealedProtectedPath(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, "/");
+  return (
+    normalized.endsWith("goal.jsonl") ||
+    normalized.endsWith("goal.config.json") ||
+    normalized.endsWith("/active") ||
+    normalized.includes("/.goal/active") ||
+    normalized.startsWith(".goal/active") ||
+    normalized.includes("/attempts/")
+  );
+}
+
 export function activeResearch(projectDir: string): ActiveResearch {
   return researchFor(projectDir, readActiveResearchId(projectDir));
 }

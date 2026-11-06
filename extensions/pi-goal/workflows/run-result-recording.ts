@@ -1,6 +1,7 @@
 import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
 import {
   cloneResearchState,
+  commitResearchState,
   type ResearchState,
   type RunResult,
 } from "../domain/research-state.ts";
@@ -16,8 +17,8 @@ import type { SessionRuntime } from "../support/runtime.ts";
 import { formatLogSummary } from "../ui/log-result-renderer.ts";
 import type { WorkspaceExecAdapter } from "../workspace/research-workspace.ts";
 import {
-  applyKeptRunResultTransaction,
-  restoreRejectedRunResultTransaction,
+  settleRunWorkspace,
+  type RunWorkspaceSettlement,
 } from "../workspace/run-result-transaction.ts";
 import {
   appendJournalEntry,
@@ -27,13 +28,12 @@ import {
 import {
   formatGateFailure,
   formatGateSummary,
-  gateJournalEntry,
-  runGate,
 } from "../execution/gate-runner.ts";
 import { checkResearchWorkspace } from "../workspace/research-workspace.ts";
 import { activeResearch } from "../persistence/research-directory.ts";
 import { readReviewerConfig } from "../persistence/goal-config.ts";
-import { runReview } from "./review-workflow.ts";
+import { gatePassed, recordGate } from "./gate-workflow.ts";
+import { recordReview } from "./review-workflow.ts";
 
 export interface RecordRunResultDeps {
   pi: WorkspaceExecAdapter;
@@ -51,6 +51,8 @@ export interface RecordRunResultDeps {
 export interface RecordRunResultBlocked {
   ok: false;
   text: string;
+  /** Set when the workspace already moved before the failure (a keep that committed). */
+  workspace?: { commit: string | null };
 }
 
 export interface RecordRunResultSuccess {
@@ -72,142 +74,94 @@ interface PreparedRunResult {
   applied: AppliedRunResult;
 }
 
+interface KeepCheckSummaries {
+  gateSummary: string;
+  gateCriteriaIds: string[];
+  gateHash: string;
+  reviewSummary: string;
+}
+
+type KeepChecks =
+  | { ok: true; summaries: KeepCheckSummaries }
+  | { ok: false; blocked: RecordRunResultBlocked };
+
+/**
+ * Log one Run Result: validate, verify (Gate, then the optional reviewer),
+ * settle the workspace, then journal and commit the state. This module owns the
+ * order; callers own how the outcome is surfaced to the agent.
+ */
 export async function recordRunResult(params: LogRunParams, deps: RecordRunResultDeps): Promise<RecordRunResult> {
-  const state = deps.state;
   const validationError = validateRunResultInput({
-    state,
+    state: deps.state,
     params,
     lastRunChecks: deps.lastRunChecks,
   });
   if (validationError) return { ok: false, text: validationError };
 
-  let gateSummary = "";
-  let reviewSummary = "";
-  let gateCriteriaIds: string[] | undefined;
-  let gateHash: string | undefined;
-  if (state.contract && params.status === "keep") {
-    const workspace = await checkResearchWorkspace(deps.pi, deps.workDir);
-    if (workspace.error) {
-      return { ok: false, text: `❌ Gate could not read the workspace: ${workspace.error}` };
-    }
-    const gate = await runGate({
-      pi: deps.pi,
-      workDir: deps.workDir,
-      contract: state.contract,
-      state,
-      metric: params.metric,
-      metrics: params.metrics,
-      changedPaths: workspace.userPaths,
-      forceKeep: params.force_keep === true,
-    });
-    const gateError = appendJournalEntry(deps.workDir, gateJournalEntry(gate));
-    if (gateError) return { ok: false, text: gateError };
-    state.gates.push(gate);
-    if (gate.verdict === "fail") return { ok: false, text: formatGateFailure(gate) };
-    gateSummary = formatGateSummary(gate);
-    gateCriteriaIds = gate.criteria
-      .filter((verdict) => verdict.blocking && verdict.pass)
-      .map((verdict) => verdict.criterionId);
-    gateHash = gate.contractHash;
-  }
+  const keepChecks = params.status === "keep" && deps.state.contract
+    ? await evaluateKeepChecks(params, deps)
+    : null;
+  if (keepChecks && !keepChecks.ok) return keepChecks.blocked;
 
-  if (state.contract && params.status === "keep") {
-    const reviewer = readReviewerConfig(deps.configDir ?? deps.workDir);
-    if (reviewer) {
-      try {
-        const workspace = await checkResearchWorkspace(deps.pi, deps.workDir);
-        const review = await runReview({
-          pi: deps.pi,
-          workDir: deps.workDir,
-          contract: state.contract,
-          state,
-          reviewer,
-          changedPaths: workspace.userPaths,
-        });
-        const reviewError = appendJournalEntry(deps.workDir, {
-          type: "review",
-          review: review.review,
-        });
-        if (reviewError) return { ok: false, text: reviewError };
-        state.reviews.push(review.review);
-        reviewSummary = review.text;
-        if (review.deniedKeep) {
-          return {
-            ok: false,
-            text: `${review.text}\n❌ Keep denied: the reviewer reproduced a blocking finding. Fix it and rerun, or log as discard with the finding in ASI.`,
-          };
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (reviewer.blocking) {
-          return { ok: false, text: `❌ Reviewer failed while blocking is enabled: ${message}` };
-        }
-        reviewSummary = `⚠️ Reviewer failed (advisory): ${message}`;
-      }
-    }
-  }
-
-  const prepared = prepareRunResult(state, params);
+  const prepared = prepareRunResult(deps.state, params);
   let text = formatLogSummary({ state: prepared.state, applied: prepared.applied, params });
-  if (gateSummary) text = `${gateSummary}\n${text}`;
-  if (reviewSummary) text = `${reviewSummary}\n${text}`;
+  if (keepChecks?.ok) {
+    if (keepChecks.summaries.gateSummary) text = `${keepChecks.summaries.gateSummary}\n${text}`;
+    if (keepChecks.summaries.reviewSummary) text = `${keepChecks.summaries.reviewSummary}\n${text}`;
+  }
 
-  const keepResult = await applyKeptRunResultTransaction({
-    pi: deps.pi,
-    workDir: deps.workDir,
-    description: params.description,
-    metricName: state.metricName,
-    metric: params.metric,
-    status: params.status,
-    secondaryMetrics: prepared.applied.secondaryMetrics,
-    criteriaIds: gateCriteriaIds,
-    gateHash,
-  });
-  text += keepResult.text;
-  if (keepResult.commit) prepared.applied.runResult.commit = keepResult.commit;
+  // A kept Run Result must commit before the journal entry, because the entry
+  // carries the commit hash. A rejected Run Result reverts only after the
+  // journal and state are durable, so a failed write never destroys the
+  // Attempt's evidence.
+  let settlement: RunWorkspaceSettlement | null = null;
+  if (params.status === "keep") {
+    settlement = await settleWorkspace(params, prepared, deps, keepChecks?.ok ? keepChecks.summaries : null);
+    text += settlement.text;
+    if (settlement.commit) prepared.applied.runResult.commit = settlement.commit;
+  }
 
   const jsonlEntry = runResultJournalEntry(prepared.state.results.length, prepared.applied.runResult);
   const journalError = appendRunResultToJournal(deps.workDir, jsonlEntry);
   if (journalError) {
-    return { ok: false, text: `${text}\n${journalError}` };
+    return {
+      ok: false,
+      text: `${text}\n${journalError}${partialSettlementNote(settlement)}`,
+      workspace: settlement ? { commit: settlement.commit } : undefined,
+    };
   }
 
-  commitPreparedRunResult(state, prepared.state);
+  commitResearchState(deps.state, prepared.state);
   deps.broadcastDashboardUpdate(deps.workDir);
 
-  const restored = await restoreRejectedRunResultTransaction({
-    pi: deps.pi,
-    workDir: deps.workDir,
-    status: params.status as "discard" | "crash" | "checks_failed",
-    runNumber: prepared.applied.runCount,
-    description: params.description,
-    attemptsDir: activeResearch(deps.workDir).paths.attempts,
-  });
-  text += restored.text;
-  if (restored.attempt) {
-    const attemptError = appendJournalEntry(deps.workDir, {
-      type: "attempt",
-      attempt: restored.attempt,
-    });
-    if (attemptError) text += `\n${attemptError}`;
+  if (params.status !== "keep") {
+    settlement = await settleWorkspace(params, prepared, deps, null);
+    text += settlement.text;
+    if (settlement.attempt) {
+      const attemptError = appendJournalEntry(deps.workDir, {
+        type: "attempt",
+        attempt: settlement.attempt,
+      });
+      if (attemptError) text += `\n${attemptError}`;
+    }
   }
 
   const afterSteer = await deps.fireHook({
     event: "after",
     cwd: deps.workDir,
     run_entry: jsonlEntry,
-    research: deps.buildResearchSnapshot(state),
+    research: deps.buildResearchSnapshot(deps.state),
   });
 
-  const limitReached = state.runLimit !== null && prepared.applied.runCount >= state.runLimit;
+  const limitReached = deps.state.runLimit !== null && prepared.applied.runCount >= deps.state.runLimit;
   let beforeSteer: string | null = null;
   if (!limitReached) {
     beforeSteer = await deps.fireHook({
       event: "before",
       cwd: deps.workDir,
-      next_run: state.results.length + 1,
+      next_run: deps.state.results.length + 1,
       last_run: jsonlEntry,
-      research: deps.buildResearchSnapshot(state),
+      research: deps.buildResearchSnapshot(deps.state),
     });
   }
 
@@ -224,26 +178,120 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
   };
 }
 
+/**
+ * A keep only lands when the Gate passes and the reviewer, if configured,
+ * allows it. Both verdicts are journaled as they are reached, so a denial still
+ * leaves its evidence behind.
+ */
+async function evaluateKeepChecks(
+  params: LogRunParams,
+  deps: RecordRunResultDeps,
+): Promise<KeepChecks> {
+  const contract = deps.state.contract;
+  if (!contract) return { ok: true, summaries: emptySummaries() };
+
+  const workspace = await checkResearchWorkspace(deps.pi, deps.workDir);
+  if (workspace.error) {
+    return fail(`❌ Gate could not read the workspace: ${workspace.error}`);
+  }
+
+  const recording = await recordGate({
+    pi: deps.pi,
+    workDir: deps.workDir,
+    contract,
+    state: deps.state,
+    metric: params.metric,
+    metrics: params.metrics,
+    forceKeep: params.force_keep === true,
+    changedPaths: workspace.userPaths,
+  });
+  if (!recording.recorded) return fail(recording.text);
+  if (!gatePassed(recording)) return fail(formatGateFailure(recording.gate));
+
+  const summaries: KeepCheckSummaries = {
+    gateSummary: formatGateSummary(recording.gate),
+    gateCriteriaIds: recording.gate.criteria
+      .filter((verdict) => verdict.blocking && verdict.pass)
+      .map((verdict) => verdict.criterionId),
+    gateHash: recording.gate.contractHash,
+    reviewSummary: "",
+  };
+
+  const reviewer = readReviewerConfig(deps.configDir ?? deps.workDir);
+  if (!reviewer) return { ok: true, summaries };
+
+  try {
+    const reviewed = await recordReview({
+      pi: deps.pi,
+      workDir: deps.workDir,
+      contract,
+      state: deps.state,
+      reviewer,
+      changedPaths: workspace.userPaths,
+    });
+    if (!reviewed.recorded) return fail(reviewed.text);
+
+    summaries.reviewSummary = reviewed.result.text;
+    if (reviewed.result.deniedKeep) {
+      return fail(
+        `${reviewed.result.text}\n❌ Keep denied: the reviewer reproduced a blocking finding. Fix it and rerun, or log as discard with the finding in ASI.`,
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (reviewer.blocking) {
+      return fail(`❌ Reviewer failed while blocking is enabled: ${message}`);
+    }
+    summaries.reviewSummary = `⚠️ Reviewer failed (advisory): ${message}`;
+  }
+
+  return { ok: true, summaries };
+}
+
+function emptySummaries(): KeepCheckSummaries {
+  return { gateSummary: "", gateCriteriaIds: [], gateHash: "", reviewSummary: "" };
+}
+
+function fail(text: string): KeepChecks {
+  return { ok: false, blocked: { ok: false, text } };
+}
+
+function settleWorkspace(
+  params: LogRunParams,
+  prepared: PreparedRunResult,
+  deps: RecordRunResultDeps,
+  summaries: KeepCheckSummaries | null,
+): Promise<RunWorkspaceSettlement> {
+  return settleRunWorkspace({
+    pi: deps.pi,
+    workDir: deps.workDir,
+    attemptsDir: activeResearch(deps.workDir).paths.attempts,
+    runNumber: prepared.applied.runCount,
+    description: params.description,
+    metricName: deps.state.metricName,
+    metric: params.metric,
+    status: params.status,
+    secondaryMetrics: prepared.applied.secondaryMetrics,
+    criteriaIds: summaries?.gateCriteriaIds,
+    gateHash: summaries?.gateHash || undefined,
+  });
+}
+
+/** Tell the agent the truth when the workspace already moved but the record did not. */
+function partialSettlementNote(settlement: RunWorkspaceSettlement | null): string {
+  if (!settlement) return "";
+  const landed = settlement.commit
+    ? `The candidate is already committed as ${settlement.commit}.`
+    : "The workspace may already hold the candidate changes.";
+  return `\n⚠️ The Run Result was NOT recorded. ${landed} Re-run log_goal to journal it.`;
+}
+
 function prepareRunResult(state: ResearchState, params: LogRunParams): PreparedRunResult {
   const preparedState = cloneResearchState(state);
   return {
     state: preparedState,
     applied: applyRunResult(preparedState, params),
   };
-}
-
-function commitPreparedRunResult(state: ResearchState, preparedState: ResearchState): void {
-  const committed = cloneResearchState(preparedState);
-  state.results = committed.results;
-  state.baselineMetric = committed.baselineMetric;
-  state.bestDirection = committed.bestDirection;
-  state.metricName = committed.metricName;
-  state.metricUnit = committed.metricUnit;
-  state.secondaryMetrics = committed.secondaryMetrics;
-  state.name = committed.name;
-  state.currentExperimentIndex = committed.currentExperimentIndex;
-  state.runLimit = committed.runLimit;
-  state.confidence = committed.confidence;
 }
 
 export function finishRecordedRunResult(runtime: SessionRuntime, limitReached: boolean): void {

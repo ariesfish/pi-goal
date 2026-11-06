@@ -9,7 +9,7 @@ import { resolveResearchToolContext } from "./tool-adapter.ts";
 import { readResearchFileContract } from "../persistence/research-files.ts";
 import { appendJournalEntry, policyJournalEntry, readLastRunResult } from "../persistence/research-journal.ts";
 import { activeResearch, selectActiveResearch } from "../persistence/research-directory.ts";
-import { clearResearchPhase, deactivateResearch, type ResearchProtocolOptions } from "../protocol/research-phase.ts";
+import { deactivateResearch, type ResearchProtocolOptions } from "../protocol/research-phase.ts";
 import { startResearchActivation } from "../protocol/research-protocol.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/research-workspace.ts";
@@ -250,7 +250,7 @@ function clearActiveResearchJournal(ctx: ExtensionContext, deps: GoalCommandDeps
     return;
   }
   const jsonlPath = activeResearch(contextResult.context.workDir).paths.journal;
-  clearResearchPhase(runtime.loop);
+  deactivateResearch(runtime.loop);
   runtime.dashboardExpanded = false;
   runtime.lastRunChecks = null;
   runtime.activeRun = null;

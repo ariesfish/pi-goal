@@ -2,8 +2,8 @@ import {
   activateResearch,
   composeResearchPhaseResumeMessage,
   deactivateResearch,
-  detectPhaseFromFiles,
-  enterResearchSealedFromFiles,
+  detectPreContractPhase,
+  enterResearchSealed,
   enterResearchNeedsInitFromFiles,
   shouldResearchAutoResumeAfterTurn,
   researchPhaseSystemPromptFor,
@@ -36,15 +36,13 @@ export function syncResearchPhaseFromResearchFiles(
         direction: state.bestDirection,
       });
     }
-    enterResearchSealedFromFiles(loop, { hasBaseline: contract.hasRuns });
+    enterResearchSealed(loop, { hasBaseline: contract.hasRuns });
     return;
   }
 
-  const phase = detectPhaseFromFiles({
+  const phase = detectPreContractPhase({
     hasRules: contract.hasRules,
-    hasConfig: contract.hasConfigHeader,
     hasBenchmarkScript: contract.hasBenchmarkScript,
-    hasContract: contract.hasContract,
   });
   if (phase === "needs_init") {
     enterResearchNeedsInitFromFiles(loop);
@@ -53,7 +51,12 @@ export function syncResearchPhaseFromResearchFiles(
   }
 }
 
-export function ensureNeedsInitFromResearchFiles(
+/**
+ * Research files can appear mid-session (the agent writes goal.md and goal.sh
+ * during a turn), so every turn re-checks for them before composing the prompt.
+ * Kept separate from `composeResearchSystemPrompt` so composing stays a read.
+ */
+export function syncResearchPhaseForTurn(
   loop: ResearchPhaseState,
   contract: ResearchFileContract,
 ): void {
@@ -67,7 +70,6 @@ export function composeResearchSystemPrompt(
   contract: ResearchFileContract,
   options: ResearchProtocolOptions,
 ): string {
-  ensureNeedsInitFromResearchFiles(loop, contract);
   return researchPhaseSystemPromptFor(loop, promptSnapshotFor(contract), options);
 }
 

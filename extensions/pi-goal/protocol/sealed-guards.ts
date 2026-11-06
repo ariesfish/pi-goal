@@ -1,4 +1,5 @@
 import type { GoalContract } from "../domain/goal-contract.ts";
+import { isSealedProtectedPath } from "../persistence/research-directory.ts";
 import { matchGlob } from "../support/glob.ts";
 import { bashWriteTargets } from "../support/shell-write-targets.ts";
 
@@ -50,7 +51,7 @@ export function isProtectedTest(filePath: string, state: SealedGuardState): bool
 }
 
 function protectedWriteReason(filePath: string, state: SealedGuardState): string | null {
-  if (isExtensionState(filePath)) {
+  if (isSealedProtectedPath(filePath)) {
     return "This path is extension-managed research state. The journal, attempts, contract, and active pointer are written by the extension, not edited directly.";
   }
   if (!state.benchmarkEditsAllowed && isBenchmarkFile(filePath)) {
@@ -60,19 +61,6 @@ function protectedWriteReason(filePath: string, state: SealedGuardState): string
     return "Test files are protected in the sealed phase. Change the code, or ask the human to run /goal allow-tests for this research.";
   }
   return null;
-}
-
-function isExtensionState(filePath: string): boolean {
-  const normalized = filePath.replace(/\\/g, "/");
-  return (
-    normalized.endsWith("goal.jsonl") ||
-    normalized.endsWith("goal.config.json") ||
-    normalized.endsWith("/active") ||
-    normalized.includes("/.goal/active") ||
-    normalized.startsWith(".goal/active") ||
-    normalized.includes("/attempts/") ||
-    normalized.includes("/.goal/attempts/")
-  );
 }
 
 function isBenchmarkFile(filePath: string): boolean {

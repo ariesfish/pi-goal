@@ -9,12 +9,8 @@ import {
 import { CheckGoalParams } from "../support/schema.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { checkResearchWorkspace } from "../workspace/research-workspace.ts";
-import {
-  formatGateSummary,
-  gateJournalEntry,
-  runGate,
-} from "../execution/gate-runner.ts";
-import { appendJournalEntry } from "../persistence/research-journal.ts";
+import { formatGateReport } from "../execution/gate-runner.ts";
+import { recordGate } from "../workflows/gate-workflow.ts";
 
 export interface CheckGoalToolDeps {
   exec: Pick<ExtensionAPI, "exec">;
@@ -59,7 +55,7 @@ export function registerCheckGoalTool(pi: ExtensionAPI, deps: CheckGoalToolDeps)
         return textToolResult(`❌ Gate could not read the workspace: ${workspace.error}`);
       }
 
-      const gate = await runGate({
+      const recording = await recordGate({
         pi: deps.exec,
         workDir,
         contract,
@@ -68,24 +64,12 @@ export function registerCheckGoalTool(pi: ExtensionAPI, deps: CheckGoalToolDeps)
         metrics: params.metrics,
         changedPaths: workspace.userPaths,
       });
-      const journalError = appendJournalEntry(workDir, gateJournalEntry(gate));
-      if (journalError) return textToolResult(journalError);
-      runtime.state.gates.push(gate);
+      if (!recording.recorded) return textToolResult(recording.text);
 
       deps.updateWidget(ctx);
       deps.broadcastDashboardUpdate(workDir);
 
-      const lines = [
-        formatGateSummary(gate),
-        ...gate.criteria.map(
-          (verdict) =>
-            `- ${verdict.criterionId}${verdict.blocking ? "" : " (advisory)"}: ${verdict.pass ? "pass" : "fail"} — ${verdict.detail}`,
-        ),
-        gate.verdict === "pass"
-          ? "log_goal keep will pass the same gate."
-          : "Fix the failing criteria or log the attempt as discard with the failure in ASI.",
-      ];
-      return textToolResult(lines.join("\n"), { gate });
+      return textToolResult(formatGateReport(recording.gate), { gate: recording.gate });
     },
 
     renderCall(_args, theme) {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  parseResearchJournalModel,
+  parseResearchJournal,
 } from "../../extensions/pi-goal/persistence/research-journal-codec.ts";
 import {
   researchStateFromJournal,
@@ -215,14 +215,15 @@ test("the latest direction snapshot wins", () => {
 });
 
 test("journal model exposes the protocol state alongside runs", () => {
-  const model = parseResearchJournalModel(journal([
+  const { state, hasConfig } = parseResearchJournal(journal([
     LEGACY_CONFIG,
     { type: "contract", contract: CONTRACT },
     LEGACY_RUN,
   ]));
 
-  assert.equal(model.contract?.hash, "sha256:contract-1");
-  assert.equal(model.results.length, 1);
+  assert.equal(hasConfig, true);
+  assert.equal(state.contract?.hash, "sha256:contract-1");
+  assert.equal(state.results.length, 1);
 });
 
 test("policy entries replay the test edit policy", () => {

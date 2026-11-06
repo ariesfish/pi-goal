@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import { activeResearch, resolveResearchFilePath } from "./research-directory.ts";
 import {
   hasResearchConfigHeader,
-  parseResearchJournalModel,
+  parseResearchJournal,
 } from "./research-journal-codec.ts";
 import {
   researchValidationError,
@@ -62,10 +62,10 @@ export function readResearchFileContract(workDir: string): ResearchFileContract 
       const content = fs.readFileSync(journalPath, "utf-8");
       hasConfigHeader = hasResearchConfigHeader(content);
       if (hasConfigHeader) {
-        const model = parseResearchJournalModel(content);
-        metricName = model.metricName;
-        hasContract = model.contract !== null;
-        hasRuns = model.results.length > 0;
+        const { state } = parseResearchJournal(content);
+        metricName = state.metricName;
+        hasContract = state.contract !== null;
+        hasRuns = state.results.length > 0;
       }
     } catch (error) {
       journalReadError = error instanceof Error ? error.message : String(error);

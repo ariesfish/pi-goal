@@ -106,17 +106,6 @@ export function resetResearchResumeCounters(state: ResearchPhaseState): void {
   state.activationTurns = 0;
 }
 
-export function enterResearchSealedFromPersistedLog(state: ResearchPhaseState): void {
-  enterResearchSealed(state, { hasBaseline: true });
-}
-
-export function enterResearchSealedFromFiles(
-  state: ResearchPhaseState,
-  options: { hasBaseline?: boolean } = {},
-): void {
-  enterResearchSealed(state, options);
-}
-
 export function enterResearchNeedsInitFromFiles(state: ResearchPhaseState): void {
   state.mode = true;
   state.phase = "needs_init";
@@ -124,7 +113,7 @@ export function enterResearchNeedsInitFromFiles(state: ResearchPhaseState): void
   state.lastRun = null;
 }
 
-function enterResearchSealed(
+export function enterResearchSealed(
   state: ResearchPhaseState,
   options: { hasBaseline?: boolean },
 ): void {
@@ -184,16 +173,16 @@ export function sealResearchContract(
   return { ok: true, phase: state.phase };
 }
 
-export function detectPhaseFromFiles(snapshot: {
+/**
+ * Phase of a research with no contract and no config header yet. A frozen
+ * contract or a config header is handled by `enterResearchSealed`
+ * before this is asked.
+ */
+export function detectPreContractPhase(snapshot: {
   hasRules: boolean;
-  hasConfig: boolean;
   hasBenchmarkScript: boolean;
-  hasContract?: boolean;
 }): ResearchPhase {
-  if (snapshot.hasContract) return "sealed";
-  if (snapshot.hasConfig) return "sealed";
-  if (snapshot.hasRules && snapshot.hasBenchmarkScript) return "needs_init";
-  return "inactive";
+  return snapshot.hasRules && snapshot.hasBenchmarkScript ? "needs_init" : "inactive";
 }
 
 export function activateResearch(
@@ -221,10 +210,6 @@ export function deactivateResearch(state: ResearchPhaseState): void {
   state.lastRun = null;
 }
 
-export function clearResearchPhase(state: ResearchPhaseState): void {
-  deactivateResearch(state);
-}
-
 export function onResearchInitialized(state: ResearchPhaseState): void {
   state.mode = true;
   state.phase = "needs_baseline";
@@ -248,13 +233,6 @@ export function onResearchRunLogged(state: ResearchPhaseState, limitReached: boo
 
 export function shouldBlockResearchRun(state: ResearchPhaseState): boolean {
   return state.phase === "awaiting_log" && state.lastRun !== null;
-}
-
-export function pausePendingResearchPhaseResume(_state: ResearchPhaseState): void {
-  // Timer ownership stays in the extension adapter. This function documents the seam.
-}
-
-export function cancelPendingResearchPhaseResume(state: ResearchPhaseState): void {
 }
 
 export function markResearchAutoResumeSent(state: ResearchPhaseState): void {

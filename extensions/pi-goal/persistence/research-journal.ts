@@ -3,15 +3,10 @@ import * as fs from "node:fs";
 import type { ResearchState, RunResult } from "../domain/research-state.ts";
 import type { Direction, GoalContract, ProbeRecord } from "../domain/goal-contract.ts";
 import { activeResearch, ensureActiveResearch } from "./research-directory.ts";
-import {
-  hydrateResearchStateFromJournal,
-  researchStateFromJournal,
-} from "./research-state-hydration.ts";
+import { hydrateResearchStateFromJournal } from "./research-state-hydration.ts";
 import {
   isRunResultEntry,
   parseJournalEntry,
-  parseResearchJournalModel,
-  type ResearchJournalModel,
 } from "./research-journal-codec.ts";
 
 export interface ExperimentConfigJournalEntry {
@@ -30,14 +25,6 @@ export function readResearchJournalContent(workDir: string): string {
 
 export function readResearchJournalLines(workDir: string): string[] {
   return readResearchJournalContent(workDir).split("\n").filter(Boolean);
-}
-
-export function readResearchJournalModel(workDir: string): ResearchJournalModel {
-  return parseResearchJournalModel(readResearchJournalContent(workDir));
-}
-
-export function readResearchStateFromJournal(workDir: string): ResearchState {
-  return researchStateFromJournal(readResearchJournalContent(workDir));
 }
 
 export function hydrateResearchStateFromJournalFile(state: ResearchState, workDir: string): boolean {

@@ -166,3 +166,20 @@ test("bash write guards honor the allow-tests and allow-benchmark policies", () 
     null,
   );
 });
+
+test("sealed protection recognises absolute paths and keeps narrative files writable", async () => {
+  const { isSealedProtectedPath } = await import(
+    "../../extensions/pi-goal/persistence/research-directory.ts"
+  );
+
+  // Extension-managed state, in both relative and absolute form.
+  assert.equal(isSealedProtectedPath(".goal/researches/default/goal.jsonl"), true);
+  assert.equal(isSealedProtectedPath("/Users/dev/project/.goal/researches/default/goal.jsonl"), true);
+  assert.equal(isSealedProtectedPath("/Users/dev/project/.goal/active"), true);
+  assert.equal(isSealedProtectedPath("/Users/dev/project/.goal/researches/default/attempts/2.patch"), true);
+
+  // Narrative files and user code an agent may still write.
+  assert.equal(isSealedProtectedPath(".goal/researches/default/goal.md"), false);
+  assert.equal(isSealedProtectedPath("goal.ideas.md"), false);
+  assert.equal(isSealedProtectedPath("goals/plan.md"), false);
+});

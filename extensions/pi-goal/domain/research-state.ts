@@ -99,9 +99,16 @@ export function cloneResearchState(state: ResearchState): ResearchState {
       })),
     })),
     attempts: state.attempts.map((attempt) => ({ ...attempt })),
-    testEditsAllowed: state.testEditsAllowed,
-    benchmarkEditsAllowed: state.benchmarkEditsAllowed,
   };
+}
+
+/**
+ * Replace a live state with the next one produced by a workflow. Lives next to
+ * `cloneResearchState` so the field list has one home: a state is created,
+ * cloned, and committed here, never field by field at the call site.
+ */
+export function commitResearchState(state: ResearchState, next: ResearchState): void {
+  Object.assign(state, next);
 }
 
 export function currentRuns(results: RunResult[], experimentIndex: number): RunResult[] {

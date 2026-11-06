@@ -11,7 +11,7 @@ import {
   isResearchConfigEntry,
   isRunResultEntry,
   parseJournalEntry,
-  parseResearchJournalModel,
+  parseResearchJournal,
 } from "../../extensions/pi-goal/persistence/research-journal-codec.ts";
 
 test("hook entries are skipped when identifying run entries", () => {
@@ -40,7 +40,7 @@ test("session name comes from the first config entry, not the first line", () =>
   assert.equal(extractResearchName(jsonl), "Hook-safe session");
 });
 
-test("parseResearchJournalModel ignores hooks and malformed journal lines while preserving run experiments", () => {
+test("parseResearchJournal ignores hooks and malformed journal lines while preserving run experiments", () => {
   const jsonl = [
     '{"type":"config","name":"Segmented session","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}',
     '{"type":"hook","stage":"before","exit_code":0}',
@@ -52,7 +52,7 @@ test("parseResearchJournalModel ignores hooks and malformed journal lines while 
     '{"run":2,"commit":"bbb2222","metric":7,"status":"keep","description":"new baseline","timestamp":2,"metrics":{"render_ms":2}}',
   ].join("\n");
 
-  const state = parseResearchJournalModel(jsonl);
+  const { state } = parseResearchJournal(jsonl);
 
   assert.equal(state.results.length, 2);
   assert.deepEqual(state.results.map((result) => result.metric), [10, 7]);

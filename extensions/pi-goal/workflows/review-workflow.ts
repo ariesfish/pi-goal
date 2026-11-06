@@ -9,6 +9,8 @@ import {
   type ReviewExecAdapter,
 } from "../execution/review-payload.ts";
 import { createReviewAdapter, type PiCommand } from "../execution/review-adapter.ts";
+import { appendJournalEntry } from "../persistence/research-journal.ts";
+import { checkResearchWorkspace } from "../workspace/research-workspace.ts";
 import type { ReviewerConfig } from "../persistence/goal-config.ts";
 
 export interface ReviewWorkflowOptions {
@@ -34,6 +36,20 @@ export interface ReviewWorkflowResult {
   precision: ReviewPrecision;
   text: string;
 }
+
+export interface RecordReviewOptions {
+  pi: ReviewExecAdapter;
+  workDir: string;
+  contract: GoalContract;
+  state: ResearchState;
+  reviewer: ReviewerConfig;
+  /** Reuse a workspace read the caller already made; otherwise one is taken. */
+  changedPaths?: string[];
+}
+
+export type ReviewRecording =
+  | { recorded: true; result: ReviewWorkflowResult }
+  | { recorded: false; text: string };
 
 export async function runReview(options: ReviewWorkflowOptions): Promise<ReviewWorkflowResult> {
   const payload = await buildReviewPayload({
@@ -70,6 +86,40 @@ export async function runReview(options: ReviewWorkflowOptions): Promise<ReviewW
     precision,
     text: summarize(review, precision, options.reviewer.blocking === true),
   };
+}
+
+/**
+ * Run the reviewer, append its findings to the Research Journal, and keep the
+ * Review Result on the in-memory state. The caller keeps the policy: which
+ * reviewer to use, and whether a failure blocks or stays advisory.
+ */
+export async function recordReview(options: RecordReviewOptions): Promise<ReviewRecording> {
+  let changedPaths = options.changedPaths;
+  if (!changedPaths) {
+    const workspace = await checkResearchWorkspace(options.pi, options.workDir);
+    if (workspace.error) {
+      return { recorded: false, text: `❌ Reviewer could not read the workspace: ${workspace.error}` };
+    }
+    changedPaths = workspace.userPaths;
+  }
+
+  const result = await runReview({
+    pi: options.pi,
+    workDir: options.workDir,
+    contract: options.contract,
+    state: options.state,
+    reviewer: options.reviewer,
+    changedPaths,
+  });
+
+  const journalError = appendJournalEntry(options.workDir, {
+    type: "review",
+    review: result.review,
+  });
+  if (journalError) return { recorded: false, text: journalError };
+
+  options.state.reviews.push(result.review);
+  return { recorded: true, result };
 }
 
 async function verifyFinding(

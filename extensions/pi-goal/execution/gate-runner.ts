@@ -62,6 +62,20 @@ export function formatGateSummary(gate: GateResult): string {
   return `Gate ${gate.verdict}: ${passed}/${gate.criteria.length} criteria pass (${gate.contractHash}).`;
 }
 
+/** Full human/agent-facing report for a standalone Gate check (check_goal). */
+export function formatGateReport(gate: GateResult): string {
+  return [
+    formatGateSummary(gate),
+    ...gate.criteria.map(
+      (verdict) =>
+        `- ${verdict.criterionId}${verdict.blocking ? "" : " (advisory)"}: ${verdict.pass ? "pass" : "fail"} — ${verdict.detail}`,
+    ),
+    gate.verdict === "pass"
+      ? "log_goal keep will pass the same gate."
+      : "Fix the failing criteria or log the attempt as discard with the failure in ASI.",
+  ].join("\n");
+}
+
 export function gateJournalEntry(gate: GateResult): Record<string, unknown> {
   return { type: "gate", gate };
 }

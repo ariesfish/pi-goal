@@ -233,3 +233,46 @@ test("run logging preserves a kept Run Result when git commit fails", async () =
     fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });
+
+test("a journal failure after a kept Run Result committed reports the landed commit", async () => {
+  const projectDir = tempProject("pi-goal-log");
+  try {
+    selectActiveResearch(projectDir, "default");
+    appendConfigEntry(projectDir);
+    const state = createResearchState();
+    state.name = "Speed";
+    state.metricName = "total_ms";
+    state.metricUnit = "ms";
+    // The journal becomes unwritable only after the candidate is committed.
+    const journal = journalPath(projectDir);
+    const brokenJournalAfterCommit = (pi) => ({
+      async exec(command, args, options) {
+        if (command === "git" && args[0] === "commit") {
+          const result = await pi.exec(command, args, options);
+          fs.rmSync(journal, { force: true });
+          fs.mkdirSync(journal, { recursive: true });
+          return result;
+        }
+        return pi.exec(command, args, options);
+      },
+    });
+    const deps = fakeDeps(projectDir, state);
+    deps.pi = brokenJournalAfterCommit(deps.pi);
+
+    const result = await recordRunResult({
+      commit: "pending",
+      metric: 100,
+      status: "keep",
+      description: "commit lands, journal fails",
+    }, deps);
+
+    assert.equal(result.ok, false);
+    assert.match(result.text, /Failed to write goal\.jsonl/);
+    assert.match(result.text, /already committed as abc1234/);
+    assert.match(result.text, /Re-run log_goal/);
+    assert.deepEqual(result.workspace, { commit: "abc1234" });
+    assert.equal(state.results.length, 0);
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});

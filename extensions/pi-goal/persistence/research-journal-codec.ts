@@ -1,6 +1,12 @@
 import { inferMetricUnit } from "../domain/metric-definition.ts";
 import {
-  emptyGoalProtocolState,
+  computeConfidence,
+  createResearchState,
+  findBaselineMetric,
+  type ResearchState,
+  type RunResult,
+} from "../domain/research-state.ts";
+import {
   type Attempt,
   type CheckExpectation,
   type Criterion,
@@ -13,7 +19,6 @@ import {
   type DirectionStatus,
   type GateResult,
   type GoalContract,
-  type GoalProtocolState,
   type ProbeRecord,
   type ReviewFinding,
   type ReviewRepro,
@@ -39,34 +44,13 @@ export interface ResearchJournalMetricDef {
   unit: string;
 }
 
-export interface ResearchJournalRun {
-  run: number;
-  commit: string;
-  metric: number;
-  metrics: Record<string, number>;
-  status: "keep" | "discard" | "crash" | "checks_failed";
-  description: string;
-  timestamp: number;
-  experimentIndex: number;
-  confidence: number | null;
-  asi?: Record<string, unknown>;
-}
-
-export interface ResearchJournalModel extends GoalProtocolState {
+/** The journal replayed into state, plus whether it has been initialized. */
+export interface ParsedJournal {
+  state: ResearchState;
+  /** A `config` header was seen: the journal holds an initialized research. */
   hasConfig: boolean;
-  testEditsAllowed: boolean;
-  benchmarkEditsAllowed: boolean;
-  name: string | null;
-  metricName: string;
-  metricUnit: string;
-  bestDirection: "lower" | "higher";
-  currentExperimentIndex: number;
-  results: ResearchJournalRun[];
-  secondaryMetrics: ResearchJournalMetricDef[];
 }
 
-const DEFAULT_METRIC_NAME = "metric";
-const DEFAULT_METRIC_UNIT = "";
 const DEFAULT_DIRECTION = "lower" as const;
 
 function isObjectRecord(value: unknown): value is JournalEntry {
@@ -87,14 +71,14 @@ function metricMapFrom(value: unknown): Record<string, number> {
   return metrics;
 }
 
-function statusFrom(value: unknown): ResearchJournalRun["status"] {
+function statusFrom(value: unknown): RunResult["status"] {
   if (value === "discard") return "discard";
   if (value === "crash") return "crash";
   if (value === "checks_failed") return "checks_failed";
   return "keep";
 }
 
-function directionFrom(value: unknown): ResearchJournalModel["bestDirection"] {
+function directionFrom(value: unknown): ResearchState["bestDirection"] {
   return value === "higher" ? "higher" : DEFAULT_DIRECTION;
 }
 
@@ -102,40 +86,31 @@ function asiFrom(value: unknown): Record<string, unknown> | undefined {
   return isObjectRecord(value) ? value : undefined;
 }
 
-function reconstructedState(): ResearchJournalModel {
-  return {
-    ...emptyGoalProtocolState(),
-    hasConfig: false,
-    testEditsAllowed: false,
-    benchmarkEditsAllowed: false,
-    name: null,
-    metricName: DEFAULT_METRIC_NAME,
-    metricUnit: DEFAULT_METRIC_UNIT,
-    bestDirection: DEFAULT_DIRECTION,
-    currentExperimentIndex: 0,
-    results: [],
-    secondaryMetrics: [],
-  };
+/**
+ * The empty state a journal replays into. Derived fields (baseline metric,
+ * confidence) are recomputed at the end of the replay, never read from the
+ * journal.
+ */
+function reconstructedState(): ResearchState {
+  return createResearchState();
 }
 
-function updateConfig(state: ResearchJournalModel, entry: ResearchConfigEntry): void {
-  state.hasConfig = true;
+function updateConfig(state: ResearchState, entry: ResearchConfigEntry): void {
   if (typeof entry.name === "string") state.name = entry.name;
   if (typeof entry.metricName === "string") state.metricName = entry.metricName;
   if (typeof entry.metricUnit === "string") state.metricUnit = entry.metricUnit;
   state.bestDirection = directionFrom(entry.bestDirection);
 }
 
-function nextExperimentIndex(state: ResearchJournalModel, experimentIndex: number): number {
+function nextExperimentIndex(state: ResearchState, experimentIndex: number): number {
   if (state.results.length === 0) return experimentIndex;
   state.secondaryMetrics = [];
   return experimentIndex + 1;
 }
 
-function runFrom(entry: ResearchRunEntry, experimentIndex: number): ResearchJournalRun {
+function runFrom(entry: ResearchRunEntry, experimentIndex: number): RunResult {
   const entryExperimentIndex = typeof entry.experimentIndex === "number" ? entry.experimentIndex : experimentIndex;
   return {
-    run: typeof entry.run === "number" ? entry.run : 0,
     commit: typeof entry.commit === "string" ? entry.commit : "",
     metric: typeof entry.metric === "number" ? entry.metric : 0,
     metrics: metricMapFrom(entry.metrics),
@@ -148,7 +123,7 @@ function runFrom(entry: ResearchRunEntry, experimentIndex: number): ResearchJour
   };
 }
 
-function registerSecondaryMetrics(state: ResearchJournalModel, metrics: Record<string, number>): void {
+function registerSecondaryMetrics(state: ResearchState, metrics: Record<string, number>): void {
   for (const name of Object.keys(metrics)) {
     if (state.secondaryMetrics.find((metric) => metric.name === name)) continue;
     state.secondaryMetrics.push({ name, unit: inferMetricUnit(name) });
@@ -365,7 +340,7 @@ function attemptFrom(value: unknown): Attempt | null {
   };
 }
 
-function upsertDirection(state: ResearchJournalModel, direction: Direction): void {
+function upsertDirection(state: ResearchState, direction: Direction): void {
   const index = state.directions.findIndex((candidate) => candidate.id === direction.id);
   if (index === -1) {
     state.directions.push(direction);
@@ -407,15 +382,17 @@ export function extractResearchName(jsonlContent: string): string {
   return firstConfigEntry(jsonlContent)?.name || "Research";
 }
 
-export function parseResearchJournalModel(jsonlContent: string): ResearchJournalModel {
+export function parseResearchJournal(jsonlContent: string): ParsedJournal {
   const state = reconstructedState();
   let experimentIndex = 0;
+  let hasConfig = false;
 
   for (const line of nonEmptyLines(jsonlContent)) {
     const entry = parseJournalEntry(line);
     if (!entry) continue;
 
     if (isResearchConfigEntry(entry)) {
+      hasConfig = true;
       updateConfig(state, entry);
       experimentIndex = nextExperimentIndex(state, experimentIndex);
       state.currentExperimentIndex = experimentIndex;
@@ -471,5 +448,7 @@ export function parseResearchJournalModel(jsonlContent: string): ResearchJournal
     registerSecondaryMetrics(state, run.metrics);
   }
 
-  return state;
+  state.baselineMetric = findBaselineMetric(state.results, state.currentExperimentIndex);
+  state.confidence = computeConfidence(state.results, state.currentExperimentIndex, state.bestDirection);
+  return { state, hasConfig };
 }

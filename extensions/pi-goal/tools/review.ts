@@ -8,10 +8,8 @@ import {
 } from "./tool-adapter.ts";
 import { ReviewGoalParams } from "../support/schema.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
-import { checkResearchWorkspace } from "../workspace/research-workspace.ts";
 import { readReviewerConfig } from "../persistence/goal-config.ts";
-import { appendJournalEntry } from "../persistence/research-journal.ts";
-import { runReview } from "../workflows/review-workflow.ts";
+import { recordReview } from "../workflows/review-workflow.ts";
 
 export interface ReviewGoalToolDeps {
   exec: Pick<ExtensionAPI, "exec">;
@@ -49,30 +47,19 @@ export function registerReviewGoalTool(pi: ExtensionAPI, deps: ReviewGoalToolDep
         );
       }
 
-      const workspace = await checkResearchWorkspace(deps.exec, workDir);
-      if (workspace.error) {
-        return textToolResult(`❌ Reviewer could not read the workspace: ${workspace.error}`);
-      }
-
       try {
-        const review = await runReview({
+        const recording = await recordReview({
           pi: deps.exec,
           workDir,
           contract,
           state: runtime.state,
           reviewer,
-          changedPaths: workspace.userPaths,
         });
-        const journalError = appendJournalEntry(workDir, {
-          type: "review",
-          review: review.review,
-        });
-        if (journalError) return textToolResult(journalError);
-        runtime.state.reviews.push(review.review);
+        if (!recording.recorded) return textToolResult(recording.text);
 
         deps.updateWidget(ctx);
         deps.broadcastDashboardUpdate(workDir);
-        return textToolResult(review.text, { review: review.review });
+        return textToolResult(recording.result.text, { review: recording.result.review });
       } catch (error) {
         return textToolResult(
           `❌ Reviewer failed: ${error instanceof Error ? error.message : String(error)}`,

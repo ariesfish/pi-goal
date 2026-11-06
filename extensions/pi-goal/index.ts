@@ -49,6 +49,7 @@ import { readResearchFileContract } from "./persistence/research-files.ts";
 import {
   composeResearchResumeMessage,
   composeResearchSystemPrompt,
+  syncResearchPhaseForTurn,
 } from "./protocol/research-protocol.ts";
 import { decideBoundaryContinuation } from "./protocol/boundary-resume.ts";
 import { markResearchAutoResumeSent } from "./protocol/research-phase.ts";
@@ -232,11 +233,9 @@ export default function goalExtension(pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event, ctx) => {
     const runtime = getRuntime(ctx);
     const workDir = resolveWorkDir(ctx.cwd);
-    const extra = composeResearchSystemPrompt(
-      runtime.loop,
-      readResearchFileContract(workDir),
-      loopOptions,
-    );
+    const fileContract = readResearchFileContract(workDir);
+    syncResearchPhaseForTurn(runtime.loop, fileContract);
+    const extra = composeResearchSystemPrompt(runtime.loop, fileContract, loopOptions);
 
     if (!extra) return;
     return {

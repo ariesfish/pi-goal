@@ -5,7 +5,7 @@ import {
   activateResearch,
   composeResearchPhaseResumeMessage,
   createResearchPhaseState,
-  detectPhaseFromFiles,
+  detectPreContractPhase,
   enterResearchNeedsInitFromFiles,
   researchAwaitingLogBlockMessage,
   onResearchInitialized,
@@ -53,7 +53,7 @@ test("existing goal files without a contract start framing, while file sync dete
 
   assert.equal(state.phase, "framing");
   assertProtocol(message, { marker: "RESEARCH_FRAMING_REQUIRED", tool: "frame_goal" });
-  assert.equal(detectPhaseFromFiles({ hasRules: true, hasConfig: false, hasBenchmarkScript: true }), "needs_init");
+  assert.equal(detectPreContractPhase({ hasRules: true, hasBenchmarkScript: true }), "needs_init");
 
   const setup = createResearchPhaseState();
   enterResearchNeedsInitFromFiles(setup);
