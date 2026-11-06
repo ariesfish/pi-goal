@@ -4,6 +4,7 @@ import {
   firstTextContent,
   resolveResearchToolContext,
   textToolResult,
+  type ResearchToolPort,
 } from "./tool-adapter.ts";
 import {
   EXPERIMENT_MAX_BYTES,
@@ -14,17 +15,10 @@ import {
   renderRunExperimentPartialText,
   renderRunExperimentResultText,
 } from "../ui/run-result-renderer.ts";
-import type { SessionRuntime } from "../support/runtime.ts";
 import { RunParams } from "../support/schema.ts";
 import { executeRunExperimentWorkflow } from "../workflows/research-workflow.ts";
 
-export interface RunExperimentToolDeps {
-  getRuntime(ctx: ExtensionContext): SessionRuntime;
-  updateWidget(ctx: ExtensionContext): void;
-  requestOverlayRender(): void;
-}
-
-export function registerRunExperimentTool(pi: ExtensionAPI, deps: RunExperimentToolDeps): void {
+export function registerRunExperimentTool(pi: ExtensionAPI, deps: ResearchToolPort): void {
   // -----------------------------------------------------------------------
   // run_goal tool
   // -----------------------------------------------------------------------
@@ -56,8 +50,7 @@ export function registerRunExperimentTool(pi: ExtensionAPI, deps: RunExperimentT
       signal,
       onUpdate,
       onActiveRunChange() {
-        deps.updateWidget(ctx);
-        deps.requestOverlayRender();
+        deps.researchChanged(ctx, workDir);
       },
     });
 

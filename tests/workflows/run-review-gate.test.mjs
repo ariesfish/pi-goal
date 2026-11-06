@@ -89,7 +89,6 @@ function fakeDeps(projectDir, state, execHandler = {}) {
         goal: currentState.name ?? "",
       };
     },
-    broadcastDashboardUpdate() {},
   };
 }
 

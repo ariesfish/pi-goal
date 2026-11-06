@@ -5,24 +5,14 @@ import {
   firstTextContent,
   resolveResearchToolContext,
   textToolResult,
+  type ResearchToolPort,
 } from "./tool-adapter.ts";
-import type { HookPayload } from "../execution/hooks.ts";
-import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
-import type { SessionRuntime } from "../support/runtime.ts";
+import { buildResearchSnapshot } from "../domain/research-snapshot.ts";
+import { readLastRunResult } from "../persistence/research-journal.ts";
 import { InitParams } from "../support/schema.ts";
-import type { ResearchState } from "../domain/research-state.ts";
 import { executeExperimentConfigWorkflow } from "../workflows/research-workflow.ts";
 
-export interface InitExperimentToolDeps {
-  getRuntime(ctx: ExtensionContext): SessionRuntime;
-  updateWidget(ctx: ExtensionContext): void;
-  broadcastDashboardUpdate(workDir: string): void;
-  fireHook(payload: HookPayload): Promise<string | null>;
-  readLastRun(workDir: string): Record<string, unknown> | null;
-  buildResearchSnapshot(state: ResearchState): ResearchSnapshot;
-}
-
-export function registerInitExperimentTool(pi: ExtensionAPI, deps: InitExperimentToolDeps): void {
+export function registerInitExperimentTool(pi: ExtensionAPI, deps: ResearchToolPort): void {
   registerExperimentConfigTool(pi, deps, {
     name: "init_goal",
     label: "Init Research",
@@ -39,7 +29,7 @@ export function registerInitExperimentTool(pi: ExtensionAPI, deps: InitExperimen
   });
 }
 
-export function registerStartExperimentTool(pi: ExtensionAPI, deps: InitExperimentToolDeps): void {
+export function registerStartExperimentTool(pi: ExtensionAPI, deps: ResearchToolPort): void {
   registerExperimentConfigTool(pi, deps, {
     name: "start_goal",
     label: "Start Experiment",
@@ -67,7 +57,7 @@ interface ExperimentConfigToolCopy {
 
 function registerExperimentConfigTool(
   pi: ExtensionAPI,
-  deps: InitExperimentToolDeps,
+  deps: ResearchToolPort,
   copy: ExperimentConfigToolCopy,
 ): void {
   pi.registerTool({
@@ -91,12 +81,11 @@ function registerExperimentConfigTool(
         kind: copy.name,
         title: copy.title,
         fireHook: deps.fireHook,
-        readLastRun: deps.readLastRun,
-        buildResearchSnapshot: deps.buildResearchSnapshot,
-        broadcastDashboardUpdate: deps.broadcastDashboardUpdate,
+        readLastRun: readLastRunResult,
+        buildResearchSnapshot,
       });
 
-      deps.updateWidget(ctx);
+      deps.researchChanged(ctx, workDir);
       if (result.ok && result.steer) pi.sendUserMessage(result.steer, { deliverAs: "steer" });
 
       return textToolResult(result.text, result.ok ? { state: result.state } : {});

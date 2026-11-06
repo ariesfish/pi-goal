@@ -5,13 +5,13 @@ import {
   firstTextContent,
   resolveResearchToolContext,
   textToolResult,
+  type ResearchToolPort,
 } from "./tool-adapter.ts";
 import {
   FreezeCriteriaParams,
   FrameGoalParams,
   ProbeGoalParams,
 } from "../support/schema.ts";
-import type { SessionRuntime } from "../support/runtime.ts";
 import { cloneResearchState } from "../domain/research-state.ts";
 import {
   executeFrameGoal,
@@ -20,21 +20,13 @@ import {
   type GoalContractWorkflowResult,
 } from "../workflows/goal-contract-workflow.ts";
 
-export interface GoalContractToolDeps {
-  exec: Pick<ExtensionAPI, "exec">;
-  getRuntime(ctx: ExtensionContext): SessionRuntime;
-  updateWidget(ctx: ExtensionContext): void;
-  broadcastDashboardUpdate(workDir: string): void;
-}
-
-export function registerGoalContractTools(pi: ExtensionAPI, deps: GoalContractToolDeps): void {
+export function registerGoalContractTools(pi: ExtensionAPI, deps: ResearchToolPort): void {
   const finish = (
     ctx: ExtensionContext,
     workDir: string,
     result: GoalContractWorkflowResult,
   ) => {
-    deps.updateWidget(ctx);
-    deps.broadcastDashboardUpdate(workDir);
+    deps.researchChanged(ctx, workDir);
     return textToolResult(
       result.text,
       result.ok ? { state: cloneResearchState(result.state) } : {},
@@ -62,7 +54,6 @@ export function registerGoalContractTools(pi: ExtensionAPI, deps: GoalContractTo
         runtime,
         workDir,
         confirm: async () => true,
-        broadcastDashboardUpdate: deps.broadcastDashboardUpdate,
       });
       return finish(ctx, workDir, result);
     },
@@ -102,7 +93,6 @@ export function registerGoalContractTools(pi: ExtensionAPI, deps: GoalContractTo
         runtime,
         workDir,
         confirm: async () => true,
-        broadcastDashboardUpdate: deps.broadcastDashboardUpdate,
       });
       return finish(ctx, workDir, result);
     },
@@ -148,7 +138,6 @@ export function registerGoalContractTools(pi: ExtensionAPI, deps: GoalContractTo
         workDir,
         confirm: (message) => ctx.ui.confirm("Freeze goal contract", message),
         exec: deps.exec,
-        broadcastDashboardUpdate: deps.broadcastDashboardUpdate,
       });
       return finish(ctx, workDir, result);
     },

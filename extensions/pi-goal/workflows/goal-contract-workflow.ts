@@ -97,7 +97,6 @@ export interface GoalWorkflowDeps {
   workDir: string;
   confirm(message: string): Promise<boolean>;
   exec?: { exec(command: string, args: string[], options: { cwd?: string; timeout?: number }): Promise<{ code: number | null; stdout: string; stderr: string }> };
-  broadcastDashboardUpdate?(workDir: string): void;
 }
 
 export type GoalContractWorkflowResult =
@@ -151,7 +150,6 @@ export function executeFrameGoal(
   const transition = enterResearchProbing(runtime.loop, directions);
   if (!transition.ok) return blocked(transition.reason ?? "Could not enter probing.");
 
-  deps.broadcastDashboardUpdate?.(workDir);
   return {
     ok: true,
     text: [
@@ -241,7 +239,6 @@ export async function executeProbeGoal(
     }
   }
 
-  deps.broadcastDashboardUpdate?.(workDir);
   const crashNote = crashed
     ? `\n⚠️ Probe command ${run.timedOut ? "timed out" : `exited ${run.exitCode}`}; recorded as killed.`
     : "";
@@ -325,7 +322,6 @@ export async function executeFreezeCriteria(
   const sealed = sealResearchContract(runtime.loop, contract, { hasBaseline });
   if (!sealed.ok) return blocked(sealed.reason ?? "Could not seal the contract.");
 
-  deps.broadcastDashboardUpdate?.(workDir);
   return {
     ok: true,
     text: [

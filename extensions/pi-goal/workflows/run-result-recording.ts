@@ -45,7 +45,6 @@ export interface RecordRunResultDeps {
   wallClockSeconds: number | null;
   fireHook(payload: HookPayload): Promise<string | null>;
   buildResearchSnapshot(state: ResearchState): ResearchSnapshot;
-  broadcastDashboardUpdate(workDir: string): void;
 }
 
 export interface RecordRunResultBlocked {
@@ -132,7 +131,6 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
   }
 
   commitResearchState(deps.state, prepared.state);
-  deps.broadcastDashboardUpdate(deps.workDir);
 
   if (params.status !== "keep") {
     settlement = await settleWorkspace(params, prepared, deps, null);

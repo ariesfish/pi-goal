@@ -1,7 +1,21 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
+import type { HookPayload } from "../execution/hooks.ts";
 import { resolveWorkDir, validateWorkDir } from "../persistence/goal-config.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
+
+/**
+ * What a tool needs from the extension host. One port rather than a per-tool
+ * callback bag: adding a host capability touches this type and the composition
+ * root, not eight dep interfaces.
+ */
+export interface ResearchToolPort {
+  getRuntime(ctx: ExtensionContext): SessionRuntime;
+  /** Announce one change to every view that mirrors research state. */
+  researchChanged(ctx: ExtensionContext, workDir: string): void;
+  exec: Pick<ExtensionAPI, "exec">;
+  fireHook(payload: HookPayload): Promise<string | null>;
+}
 
 export interface ResearchToolContext {
   runtime: SessionRuntime;

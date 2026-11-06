@@ -4,12 +4,12 @@ import {
   firstTextContent,
   resolveResearchToolContext,
   textToolResult,
+  type ResearchToolPort,
 } from "./tool-adapter.ts";
 import { formatMetricValue } from "../ui/metric-format.ts";
-import type { HookPayload } from "../execution/hooks.ts";
-import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
+import { buildResearchSnapshot } from "../domain/research-snapshot.ts";
 
-import type { SessionRuntime, LogDetails } from "../support/runtime.ts";
+import type { LogDetails } from "../support/runtime.ts";
 import { LogParams } from "../support/schema.ts";
 import {
   cloneResearchState,
@@ -21,16 +21,7 @@ import {
   recordRunResult,
 } from "../workflows/run-result-recording.ts";
 
-export interface LogExperimentToolDeps {
-  getRuntime(ctx: ExtensionContext): SessionRuntime;
-  updateWidget(ctx: ExtensionContext): void;
-  requestOverlayRender(): void;
-  broadcastDashboardUpdate(workDir: string): void;
-  fireHook(payload: HookPayload): Promise<string | null>;
-  buildResearchSnapshot(state: ResearchState): ResearchSnapshot;
-}
-
-export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentToolDeps): void {
+export function registerLogExperimentTool(pi: ExtensionAPI, deps: ResearchToolPort): void {
   // -----------------------------------------------------------------------
   // log_goal tool
   // -----------------------------------------------------------------------
@@ -66,8 +57,7 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
       lastRunChecks: runtime.lastRunChecks,
       wallClockSeconds: runtime.lastRunDuration,
       fireHook: deps.fireHook,
-      buildResearchSnapshot: deps.buildResearchSnapshot,
-      broadcastDashboardUpdate: deps.broadcastDashboardUpdate,
+      buildResearchSnapshot,
     });
 
     if (!result.ok) return textToolResult(result.text);
@@ -83,10 +73,7 @@ export function registerLogExperimentTool(pi: ExtensionAPI, deps: LogExperimentT
       pi.sendUserMessage(result.beforeSteer, { deliverAs: "steer" });
     }
 
-    deps.updateWidget(ctx);
-
-    // Refresh fullscreen overlay if open
-    deps.requestOverlayRender();
+    deps.researchChanged(ctx, workDir);
 
     return textToolResult(text, {
       runResult: { ...result.runResult, metrics: { ...result.runResult.metrics } },

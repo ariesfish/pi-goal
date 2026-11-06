@@ -5,22 +5,15 @@ import {
   firstTextContent,
   resolveResearchToolContext,
   textToolResult,
+  type ResearchToolPort,
 } from "./tool-adapter.ts";
 import { CheckGoalParams } from "../support/schema.ts";
-import type { SessionRuntime } from "../support/runtime.ts";
+import { readLastRunResult } from "../persistence/research-journal.ts";
 import { checkResearchWorkspace } from "../workspace/research-workspace.ts";
 import { formatGateReport } from "../execution/gate-runner.ts";
 import { recordGate } from "../workflows/gate-workflow.ts";
 
-export interface CheckGoalToolDeps {
-  exec: Pick<ExtensionAPI, "exec">;
-  getRuntime(ctx: ExtensionContext): SessionRuntime;
-  updateWidget(ctx: ExtensionContext): void;
-  broadcastDashboardUpdate(workDir: string): void;
-  readLastRun(workDir: string): Record<string, unknown> | null;
-}
-
-export function registerCheckGoalTool(pi: ExtensionAPI, deps: CheckGoalToolDeps): void {
+export function registerCheckGoalTool(pi: ExtensionAPI, deps: ResearchToolPort): void {
   pi.registerTool({
     name: "check_goal",
     label: "Check Gate",
@@ -43,7 +36,7 @@ export function registerCheckGoalTool(pi: ExtensionAPI, deps: CheckGoalToolDeps)
         return textToolResult("❌ No frozen contract. Call freeze_criteria before check_goal.");
       }
 
-      const lastRun = deps.readLastRun(workDir);
+      const lastRun = readLastRunResult(workDir);
       const lastMetric = typeof lastRun?.metric === "number" ? lastRun.metric : null;
       const metric = params.metric ?? lastMetric;
       if (metric === null) {
@@ -66,8 +59,7 @@ export function registerCheckGoalTool(pi: ExtensionAPI, deps: CheckGoalToolDeps)
       });
       if (!recording.recorded) return textToolResult(recording.text);
 
-      deps.updateWidget(ctx);
-      deps.broadcastDashboardUpdate(workDir);
+      deps.researchChanged(ctx, workDir);
 
       return textToolResult(formatGateReport(recording.gate), { gate: recording.gate });
     },

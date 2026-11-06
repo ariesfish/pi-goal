@@ -40,7 +40,6 @@ function deps(workDir, runtime, overrides = {}) {
         goal: state.name ?? "",
       };
     },
-    broadcastDashboardUpdate() {},
     ...overrides,
   };
 }
@@ -49,19 +48,17 @@ test("experiment config workflow initializes Research and writes the first Exper
   const workDir = setupProject();
   try {
     const runtime = createSessionRuntime();
-    let broadcasted = false;
     const result = await executeExperimentConfigWorkflow({
       name: "Speed",
       metric_name: "total_ms",
       metric_unit: "ms",
       direction: "lower",
-    }, deps(workDir, runtime, { broadcastDashboardUpdate() { broadcasted = true; } }));
+    }, deps(workDir, runtime));
 
     assert.equal(result.ok, true);
     assert.equal(runtime.state.name, "Speed");
     assert.equal(runtime.state.metricName, "total_ms");
     assert.equal(runtime.loop.phase, "needs_baseline");
-    assert.equal(broadcasted, true);
     const lines = fs.readFileSync(activeResearch(workDir).paths.journal, "utf-8").trim().split("\n");
     assert.equal(lines.length, 2);
     assert.deepEqual(JSON.parse(lines[0]), {

@@ -30,7 +30,6 @@ import {
 import { resolveGoalShortcuts } from "./support/shortcuts.ts";
 import { resolveWorkDir } from "./persistence/goal-config.ts";
 
-import { checkResearchWorkspace } from "./workspace/research-workspace.ts";
 import { activeResearch } from "./persistence/research-directory.ts";
 import {
   createRuntimeStore,
@@ -40,11 +39,10 @@ import { createDashboardServer } from "./ui/browser-dashboard.ts";
 import { createDashboardOverlayController } from "./ui/dashboard-overlay.ts";
 import { createWidgetController } from "./ui/widget.ts";
 import { registerValidateResearchTool } from "./tools/validate.ts";
+import type { ResearchToolPort } from "./tools/tool-adapter.ts";
 import { registerInitExperimentTool, registerStartExperimentTool } from "./tools/init.ts";
 import { registerRunExperimentTool } from "./tools/run.ts";
 import { registerLogExperimentTool } from "./tools/log.ts";
-import { readLastRunResult } from "./persistence/research-journal.ts";
-import { buildResearchSnapshot } from "./domain/research-snapshot.ts";
 import { readResearchFileContract } from "./persistence/research-files.ts";
 import {
   composeResearchResumeMessage,
@@ -107,8 +105,6 @@ export default function goalExtension(pi: ExtensionAPI) {
   const getRuntime = (ctx: ExtensionContext): SessionRuntime =>
     runtimeStore.ensure(getSessionKey(ctx));
 
-  const readLastRun = readLastRunResult;
-
   const fireHook = async (payload: HookPayload): Promise<string | null> => {
     const result = await runHook(payload);
     appendHookLogEntryIfConfigured(activeResearch(payload.cwd).paths.journal, payload.event, result);
@@ -119,6 +115,14 @@ export default function goalExtension(pi: ExtensionAPI) {
   const widget = createWidgetController({ dashboardHintVariants });
   const dashboardServer = createDashboardServer();
   const broadcastDashboardUpdate = (workDir: string): void => dashboardServer.broadcast(workDir);
+
+  // One announcement for the widget, the fullscreen overlay, and the browser
+  // dashboard: they all mirror research state, so a caller never has to pick.
+  const researchChanged = (ctx: ExtensionContext, workDir: string): void => {
+    updateWidget(ctx);
+    dashboardOverlay.requestRender();
+    broadcastDashboardUpdate(workDir);
+  };
   const stopDashboardServer = (): void => dashboardServer.stop();
 
   const clearSessionUi = (ctx: ExtensionContext) => {
@@ -253,65 +257,29 @@ export default function goalExtension(pi: ExtensionAPI) {
   // Experiment configuration tools
   // -----------------------------------------------------------------------
 
-  const experimentConfigToolDeps = {
-    getRuntime,
-    updateWidget,
-    broadcastDashboardUpdate,
-    fireHook,
-    readLastRun,
-    buildResearchSnapshot,
-  };
-  registerInitExperimentTool(pi, experimentConfigToolDeps);
-  registerStartExperimentTool(pi, experimentConfigToolDeps);
+  const toolPort: ResearchToolPort = { getRuntime, researchChanged, exec: pi, fireHook };
+  registerInitExperimentTool(pi, toolPort);
+  registerStartExperimentTool(pi, toolPort);
 
   // -----------------------------------------------------------------------
   // goal contract tools: frame_goal, probe_goal, freeze_criteria
   // -----------------------------------------------------------------------
 
-  registerGoalContractTools(pi, {
-    exec: pi,
-    getRuntime,
-    updateWidget,
-    broadcastDashboardUpdate,
-  });
-
-  registerCheckGoalTool(pi, {
-    exec: pi,
-    getRuntime,
-    updateWidget,
-    broadcastDashboardUpdate,
-    readLastRun,
-  });
-
-  registerReviewGoalTool(pi, {
-    exec: pi,
-    getRuntime,
-    updateWidget,
-    broadcastDashboardUpdate,
-  });
+  registerGoalContractTools(pi, toolPort);
+  registerCheckGoalTool(pi, toolPort);
+  registerReviewGoalTool(pi, toolPort);
 
   // -----------------------------------------------------------------------
   // run_goal tool
   // -----------------------------------------------------------------------
 
-  registerRunExperimentTool(pi, {
-    getRuntime,
-    updateWidget,
-    requestOverlayRender: () => dashboardOverlay.requestRender(),
-  });
+  registerRunExperimentTool(pi, toolPort);
 
   // -----------------------------------------------------------------------
   // log_goal tool
   // -----------------------------------------------------------------------
 
-  registerLogExperimentTool(pi, {
-    getRuntime,
-    updateWidget,
-    requestOverlayRender: () => dashboardOverlay.requestRender(),
-    broadcastDashboardUpdate,
-    fireHook,
-    buildResearchSnapshot,
-  });
+  registerLogExperimentTool(pi, toolPort);
 
   // -----------------------------------------------------------------------
   // Toggle dashboard expand/collapse shortcut
@@ -358,15 +326,11 @@ export default function goalExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   registerGoalCommand(pi, {
-    getRuntime,
-    updateWidget,
+    ...toolPort,
     clearSessionUi,
     reconstructState,
     stopDashboardServer,
     exportDashboard: (ctx, workDir) => dashboardServer.export(ctx, workDir),
     loopOptions,
-    fireHook,
-    buildResearchSnapshot,
-    checkWorkspace: checkResearchWorkspace,
   });
 }

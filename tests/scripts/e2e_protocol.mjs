@@ -153,8 +153,7 @@ async function main() {
           goal: state.name ?? "",
         };
       },
-      broadcastDashboardUpdate() {},
-    };
+      };
 
     const baseline = await recordRunResult({
       commit: "pending",

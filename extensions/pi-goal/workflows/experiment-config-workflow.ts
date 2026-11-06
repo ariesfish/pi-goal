@@ -32,7 +32,6 @@ export interface ExperimentConfigWorkflowDeps {
   fireHook(payload: HookPayload): Promise<string | null>;
   readLastRun(workDir: string): Record<string, unknown> | null;
   buildResearchSnapshot(state: ResearchState): ResearchSnapshot;
-  broadcastDashboardUpdate(workDir: string): void;
 }
 
 export interface ExperimentConfigWorkflowBlocked {
@@ -94,8 +93,6 @@ export async function executeExperimentConfigWorkflow(
   if (contractError) {
     return { ok: false, text: contractError };
   }
-  deps.broadcastDashboardUpdate(workDir);
-
   const wasInactive = !runtime.loop.mode;
   onResearchInitialized(runtime.loop);
 

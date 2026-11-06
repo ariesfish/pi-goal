@@ -35,7 +35,6 @@ function fakeDeps(projectDir, state, overrides = {}) {
         goal: currentState.name ?? "",
       };
     },
-    broadcastDashboardUpdate() {},
     ...overrides,
   };
 }

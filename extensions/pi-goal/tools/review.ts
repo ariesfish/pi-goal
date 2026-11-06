@@ -5,20 +5,13 @@ import {
   firstTextContent,
   resolveResearchToolContext,
   textToolResult,
+  type ResearchToolPort,
 } from "./tool-adapter.ts";
 import { ReviewGoalParams } from "../support/schema.ts";
-import type { SessionRuntime } from "../support/runtime.ts";
 import { readReviewerConfig } from "../persistence/goal-config.ts";
 import { recordReview } from "../workflows/review-workflow.ts";
 
-export interface ReviewGoalToolDeps {
-  exec: Pick<ExtensionAPI, "exec">;
-  getRuntime(ctx: ExtensionContext): SessionRuntime;
-  updateWidget(ctx: ExtensionContext): void;
-  broadcastDashboardUpdate(workDir: string): void;
-}
-
-export function registerReviewGoalTool(pi: ExtensionAPI, deps: ReviewGoalToolDeps): void {
+export function registerReviewGoalTool(pi: ExtensionAPI, deps: ResearchToolPort): void {
   pi.registerTool({
     name: "review_goal",
     label: "Review Goal",
@@ -57,8 +50,7 @@ export function registerReviewGoalTool(pi: ExtensionAPI, deps: ReviewGoalToolDep
         });
         if (!recording.recorded) return textToolResult(recording.text);
 
-        deps.updateWidget(ctx);
-        deps.broadcastDashboardUpdate(workDir);
+        deps.researchChanged(ctx, workDir);
         return textToolResult(recording.result.text, { review: recording.result.review });
       } catch (error) {
         return textToolResult(

@@ -2,10 +2,9 @@ import * as fs from "node:fs";
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { createResearchState, type ResearchState } from "../domain/research-state.ts";
-import type { HookPayload } from "../execution/hooks.ts";
-import type { ResearchSnapshot } from "../domain/research-snapshot.ts";
-import { resolveResearchToolContext } from "./tool-adapter.ts";
+import { createResearchState } from "../domain/research-state.ts";
+import { buildResearchSnapshot } from "../domain/research-snapshot.ts";
+import { resolveResearchToolContext, type ResearchToolPort } from "./tool-adapter.ts";
 import { readResearchFileContract } from "../persistence/research-files.ts";
 import { appendJournalEntry, policyJournalEntry, readLastRunResult } from "../persistence/research-journal.ts";
 import { activeResearch, selectActiveResearch } from "../persistence/research-directory.ts";
@@ -14,17 +13,12 @@ import { startResearchActivation } from "../protocol/research-protocol.ts";
 import type { SessionRuntime } from "../support/runtime.ts";
 import { checkResearchWorkspace, formatWorkspaceSafetyError } from "../workspace/research-workspace.ts";
 
-export interface GoalCommandDeps {
-  getRuntime(ctx: ExtensionContext): SessionRuntime;
-  updateWidget(ctx: ExtensionContext): void;
+export interface GoalCommandDeps extends ResearchToolPort {
   clearSessionUi(ctx: ExtensionContext): void;
   reconstructState(ctx: ExtensionContext): void;
   stopDashboardServer(): void;
   exportDashboard(ctx: ExtensionContext, workDir: string): Promise<void>;
   loopOptions: ResearchProtocolOptions;
-  fireHook(payload: HookPayload): Promise<string | null>;
-  buildResearchSnapshot(state: ResearchState): ResearchSnapshot;
-  checkWorkspace(pi: ExtensionAPI, workDir: string): ReturnType<typeof checkResearchWorkspace>;
 }
 
 export function registerGoalCommand(pi: ExtensionAPI, deps: GoalCommandDeps): void {
@@ -256,7 +250,7 @@ function clearActiveResearchJournal(ctx: ExtensionContext, deps: GoalCommandDeps
   runtime.activeRun = null;
   runtime.state = createResearchState();
   deps.stopDashboardServer();
-  deps.updateWidget(ctx);
+  deps.researchChanged(ctx, contextResult.context.workDir);
 
   if (fs.existsSync(jsonlPath)) {
     try {
@@ -291,7 +285,7 @@ async function startOrResumeResearch(
     return;
   }
   const workDir = contextResult.context.workDir;
-  const dirtyCheck = await deps.checkWorkspace(pi, workDir);
+  const dirtyCheck = await checkResearchWorkspace(pi, workDir);
   const dirtyBlock = formatWorkspaceSafetyError(dirtyCheck);
   if (dirtyBlock) {
     ctx.ui.notify(dirtyBlock, "error");
@@ -312,7 +306,7 @@ async function startOrResumeResearch(
     cwd: workDir,
     next_run: state.results.length + 1,
     last_run: readLastRunResult(workDir),
-    research: deps.buildResearchSnapshot(state),
+    research: buildResearchSnapshot(state),
   });
 
   sendWhenReady(

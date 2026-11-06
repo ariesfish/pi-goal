@@ -34,7 +34,6 @@ function configDeps(workDir, runtime, overrides = {}) {
     async fireHook() { return null; },
     readLastRun() { return null; },
     buildResearchSnapshot,
-    broadcastDashboardUpdate() {},
     ...overrides,
   };
 }
@@ -48,7 +47,6 @@ function logDeps(workDir, runtime, overrides = {}) {
     wallClockSeconds: runtime.lastRunDuration,
     async fireHook() { return null; },
     buildResearchSnapshot,
-    broadcastDashboardUpdate() {},
     ...overrides,
   };
 }
