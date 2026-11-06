@@ -20,16 +20,19 @@ pi install npm:@ariesfish/pi-goal
 
 Requires **pi >= 1.5.0** (the `agent_before_settle` boundary drives the loop).
 
-Manual install:
+From a checkout instead, without changing your settings:
 
 ```bash
-cp -r extensions/pi-goal ~/.pi/agent/extensions/
-cp -r skills/goal-create ~/.pi/agent/skills/
-cp -r skills/goal-finalize ~/.pi/agent/skills/
-cp -r skills/goal-hooks ~/.pi/agent/skills/
+pi -e .
 ```
 
-Then run `/reload` in pi.
+Or install the checkout itself:
+
+```bash
+pi install .
+```
+
+`pi list` shows installed packages; `pi update --extensions` picks up a new release.
 
 ---
 
