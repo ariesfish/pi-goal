@@ -4,13 +4,9 @@
  * Generic autonomous research loop infrastructure.
  * Domain-specific behavior comes from skills (what command to run, what to optimize).
  *
- * Provides:
- * - `run_goal` tool — runs any command, times it, captures output, detects pass/fail
- * - `log_goal` tool — records run results with research-persisted state
- * - Status widget showing run count + best metric
- * - Configurable shortcuts to expand/collapse and fullscreen the dashboard
- * - Adds research guidance to the system prompt and points the agent at goal.md
- * - Injects goal.md into context on every turn via before_agent_start
+ * This file is the composition root: it builds the session-scoped runtimes and
+ * views, then hands one port to each registration module. Behaviour lives in
+ * `tools/` (host adapters), `protocol/` (phase and guards), and `workflows/`.
  */
 
 import type {
@@ -23,13 +19,8 @@ import {
   appendHookLogEntryIfConfigured,
   type HookPayload,
 } from "./execution/hooks.ts";
-import {
-  resetResearchPhaseForAgentStart,
-  type ResearchProtocolOptions,
-} from "./protocol/research-phase.ts";
 import { resolveGoalShortcuts } from "./support/shortcuts.ts";
 import { resolveWorkDir } from "./persistence/goal-config.ts";
-
 import { activeResearch } from "./persistence/research-directory.ts";
 import {
   createRuntimeStore,
@@ -38,45 +29,28 @@ import {
 import { createDashboardServer } from "./ui/browser-dashboard.ts";
 import { createDashboardOverlayController } from "./ui/dashboard-overlay.ts";
 import { createWidgetController } from "./ui/widget.ts";
-import { registerValidateResearchTool } from "./tools/validate.ts";
+import { restoreActiveResearchRuntime } from "./support/research-runtime-restore.ts";
 import type { ResearchToolPort } from "./tools/tool-adapter.ts";
+import {
+  registerDashboardShortcuts,
+  registerSessionHandlers,
+  type SessionHandlerDeps,
+} from "./tools/session-handlers.ts";
+import { registerValidateResearchTool } from "./tools/validate.ts";
 import { registerInitExperimentTool, registerStartExperimentTool } from "./tools/init.ts";
 import { registerRunExperimentTool } from "./tools/run.ts";
 import { registerLogExperimentTool } from "./tools/log.ts";
-import { readResearchFileContract } from "./persistence/research-files.ts";
-import {
-  composeResearchResumeMessage,
-  composeResearchSystemPrompt,
-  syncResearchPhaseForTurn,
-} from "./protocol/research-protocol.ts";
-import { decideBoundaryContinuation } from "./protocol/boundary-resume.ts";
-import { markResearchAutoResumeSent } from "./protocol/research-phase.ts";
-import { sealedToolCallBlock } from "./protocol/sealed-guards.ts";
-import { restoreActiveResearchRuntime } from "./support/research-runtime-restore.ts";
-import { buildResearchCompactionSummary, researchSummaryPathsFor } from "./support/compaction.ts";
 import { registerGoalCommand } from "./tools/goal-command.ts";
 import { registerGoalContractTools } from "./tools/contract.ts";
 import { registerCheckGoalTool } from "./tools/check.ts";
 import { registerReviewGoalTool } from "./tools/review.ts";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-
-// ---------------------------------------------------------------------------
-// Extension
-// ---------------------------------------------------------------------------
-
 export default function goalExtension(pi: ExtensionAPI) {
-  const MAX_AUTORESUME_TURNS = 200;
-  const MAX_ACTIVATION_TURNS = 50;
-  const BENCHMARK_GUARDRAIL =
-    "Be careful not to overfit to the benchmarks and do not cheat on the benchmarks.";
-  const loopOptions: ResearchProtocolOptions = {
-    maxAutoResumeTurns: MAX_AUTORESUME_TURNS,
-    maxActivationTurns: MAX_ACTIVATION_TURNS,
-    benchmarkGuardrail: BENCHMARK_GUARDRAIL,
+  const loopOptions = {
+    maxAutoResumeTurns: 200,
+    maxActivationTurns: 50,
+    benchmarkGuardrail:
+      "Be careful not to overfit to the benchmarks and do not cheat on the benchmarks.",
   };
 
   const shortcuts = resolveGoalShortcuts();
@@ -100,10 +74,20 @@ export default function goalExtension(pi: ExtensionAPI) {
     return [toggle, fullscreen].filter((hint): hint is string => hint !== null);
   };
 
+  // -------------------------------------------------------------------------
+  // Session-scoped runtimes and views
+  // -------------------------------------------------------------------------
+
   const runtimeStore = createRuntimeStore();
   const getSessionKey = (ctx: ExtensionContext) => ctx.sessionManager.getSessionId();
   const getRuntime = (ctx: ExtensionContext): SessionRuntime =>
     runtimeStore.ensure(getSessionKey(ctx));
+
+  const dashboardOverlay = createDashboardOverlayController();
+  const widget = createWidgetController({ dashboardHintVariants });
+  const dashboardServer = createDashboardServer();
+
+  const updateWidget = (ctx: ExtensionContext) => widget.update(ctx, getRuntime(ctx));
 
   const fireHook = async (payload: HookPayload): Promise<string | null> => {
     const result = await runHook(payload);
@@ -111,33 +95,22 @@ export default function goalExtension(pi: ExtensionAPI) {
     return steerMessageFor(payload.event, result);
   };
 
-  const dashboardOverlay = createDashboardOverlayController();
-  const widget = createWidgetController({ dashboardHintVariants });
-  const dashboardServer = createDashboardServer();
-  const broadcastDashboardUpdate = (workDir: string): void => dashboardServer.broadcast(workDir);
-
   // One announcement for the widget, the fullscreen overlay, and the browser
   // dashboard: they all mirror research state, so a caller never has to pick.
   const researchChanged = (ctx: ExtensionContext, workDir: string): void => {
     updateWidget(ctx);
     dashboardOverlay.requestRender();
-    broadcastDashboardUpdate(workDir);
+    dashboardServer.broadcast(workDir);
   };
-  const stopDashboardServer = (): void => dashboardServer.stop();
 
   const clearSessionUi = (ctx: ExtensionContext) => {
     dashboardOverlay.clear();
     widget.clear(ctx);
   };
 
-  // -----------------------------------------------------------------------
-  // State reconstruction
-  // -----------------------------------------------------------------------
-
   const reconstructState = (ctx: ExtensionContext) => {
-    const runtime = getRuntime(ctx);
     restoreActiveResearchRuntime({
-      runtime,
+      runtime: getRuntime(ctx),
       workDir: resolveWorkDir(ctx.cwd),
       ctxCwd: ctx.cwd,
       sessionBranch: ctx.sessionManager.getBranch(),
@@ -145,191 +118,46 @@ export default function goalExtension(pi: ExtensionAPI) {
     updateWidget(ctx);
   };
 
-  const updateWidget = (ctx: ExtensionContext) => widget.update(ctx, getRuntime(ctx));
-
-  pi.on("session_start", async (_e, ctx) => reconstructState(ctx));
-  pi.on("session_tree", async (_e, ctx) => reconstructState(ctx));
-  pi.on("session_before_switch", async () => {
-    dashboardOverlay.clear();
-  });
-
-  pi.on("session_before_compact", async (event, ctx) => {
-    const runtime = getRuntime(ctx);
-    if (!runtime.loop.mode) return;
-    return {
-      compaction: {
-        summary: buildResearchCompactionSummary(
-          researchSummaryPathsFor(resolveWorkDir(ctx.cwd)),
-          runtime.loop.phase,
-        ),
-        firstKeptEntryId: event.preparation.firstKeptEntryId,
-        tokensBefore: event.preparation.tokensBefore,
-      },
-    };
-  });
-  pi.on("session_shutdown", async (_e, ctx) => {
-    clearSessionUi(ctx);
-    runtimeStore.clear(getSessionKey(ctx));
-    stopDashboardServer();
-  });
-
-  pi.on("agent_start", async (_event, ctx) => {
-    const runtime = getRuntime(ctx);
-    resetResearchPhaseForAgentStart(runtime.loop);
-  });
-
-  pi.on("agent_end", async (_event, ctx) => {
-    const runtime = getRuntime(ctx);
-    runtime.activeRun = null;
-    dashboardOverlay.requestRender();
-  });
-
-  // Sealed phase: the extension owns test edits, git mutations, and research state.
-  pi.on("tool_call", async (event, ctx) => {
-    const runtime = getRuntime(ctx);
-    const reason = sealedToolCallBlock(
-      {
-        phase: runtime.loop.phase,
-        contract: runtime.state.contract,
-        testEditsAllowed: runtime.state.testEditsAllowed,
-        benchmarkEditsAllowed: runtime.state.benchmarkEditsAllowed,
-      },
-      { toolName: event.toolName, input: event.input as Record<string, unknown> },
-    );
-    if (!reason) return;
-    return { block: true, reason };
-  });
-
-  // Final actionable boundary: request one continuation instead of racing a timer.
-  pi.on("agent_before_settle", async (event, ctx) => {
-    const runtime = getRuntime(ctx);
-    const decision = decideBoundaryContinuation({
-      runtime,
-      options: loopOptions,
-      canContinue: event.context.canContinue,
-      outcome: event.outcome,
-      composeMessage: () => composeResearchResumeMessage(runtime, loopOptions),
-    });
-
-    if (decision.action === "stop") {
-      ctx.ui.notify(decision.reason, "info");
-      return;
-    }
-    if (decision.action !== "continue") return;
-
-    markResearchAutoResumeSent(runtime.loop);
-    return {
-      entries: [
-        ...event.entries,
-        {
-          type: "custom_message" as const,
-          customType: "goal-next-action",
-          content: decision.message,
-          display: false,
-        },
-      ],
-      continue: true,
-    };
-  });
-
-  // When in goal mode, add phase-specific loop control to the system prompt.
-  // Only paths and required actions — no file content, fully cache-safe.
-  pi.on("before_agent_start", async (event, ctx) => {
-    const runtime = getRuntime(ctx);
-    const workDir = resolveWorkDir(ctx.cwd);
-    const fileContract = readResearchFileContract(workDir);
-    syncResearchPhaseForTurn(runtime.loop, fileContract);
-    const extra = composeResearchSystemPrompt(runtime.loop, fileContract, loopOptions);
-
-    if (!extra) return;
-    return {
-      systemPrompt: event.systemPrompt + extra,
-    };
-  });
-
-  // -----------------------------------------------------------------------
-  // validate_goal tool
-  // -----------------------------------------------------------------------
-
-  registerValidateResearchTool(pi);
-
-  // -----------------------------------------------------------------------
-  // Experiment configuration tools
-  // -----------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Ports: one per registration module
+  // -------------------------------------------------------------------------
 
   const toolPort: ResearchToolPort = { getRuntime, researchChanged, exec: pi, fireHook };
+
+  const sessionDeps: SessionHandlerDeps = {
+    port: toolPort,
+    loopOptions,
+    shortcuts,
+    reconstruct: reconstructState,
+    clearSessionUi,
+    clearOverlay: () => dashboardOverlay.clear(),
+    requestOverlayRender: () => dashboardOverlay.requestRender(),
+    openDashboard: (ctx, runtime) => dashboardOverlay.open(ctx, runtime),
+    stopDashboard: () => dashboardServer.stop(),
+    clearRuntime: (ctx) => runtimeStore.clear(getSessionKey(ctx)),
+  };
+
+  // -------------------------------------------------------------------------
+  // Registration
+  // -------------------------------------------------------------------------
+
+  registerSessionHandlers(pi, sessionDeps);
+  registerDashboardShortcuts(pi, sessionDeps);
+
+  registerValidateResearchTool(pi);
   registerInitExperimentTool(pi, toolPort);
   registerStartExperimentTool(pi, toolPort);
-
-  // -----------------------------------------------------------------------
-  // goal contract tools: frame_goal, probe_goal, freeze_criteria
-  // -----------------------------------------------------------------------
-
   registerGoalContractTools(pi, toolPort);
   registerCheckGoalTool(pi, toolPort);
   registerReviewGoalTool(pi, toolPort);
-
-  // -----------------------------------------------------------------------
-  // run_goal tool
-  // -----------------------------------------------------------------------
-
   registerRunExperimentTool(pi, toolPort);
-
-  // -----------------------------------------------------------------------
-  // log_goal tool
-  // -----------------------------------------------------------------------
-
   registerLogExperimentTool(pi, toolPort);
-
-  // -----------------------------------------------------------------------
-  // Toggle dashboard expand/collapse shortcut
-  // -----------------------------------------------------------------------
-
-  if (shortcuts.toggleDashboard) {
-    pi.registerShortcut(shortcuts.toggleDashboard as any, {
-      description: "Toggle goal dashboard",
-      handler: async (ctx) => {
-        const runtime = getRuntime(ctx);
-        const state = runtime.state;
-        if (state.results.length === 0 && !runtime.loop.mode) {
-          ctx.ui.notify("No runs yet — run /goal to get started", "info");
-          return;
-        }
-        runtime.dashboardExpanded = !runtime.dashboardExpanded;
-        updateWidget(ctx);
-      },
-    });
-  }
-
-  // -----------------------------------------------------------------------
-  // Fullscreen scrollable dashboard overlay shortcut
-  // -----------------------------------------------------------------------
-
-  if (shortcuts.fullscreenDashboard) {
-    pi.registerShortcut(shortcuts.fullscreenDashboard as any, {
-      description: "Fullscreen goal dashboard",
-      handler: async (ctx) => {
-        const runtime = getRuntime(ctx);
-        const state = runtime.state;
-        if (state.results.length === 0 && !runtime.loop.mode) {
-          ctx.ui.notify("No runs yet", "info");
-          return;
-        }
-
-        await dashboardOverlay.open(ctx, runtime);
-      },
-    });
-  }
-
-  // -----------------------------------------------------------------------
-  // /goal command
-  // -----------------------------------------------------------------------
 
   registerGoalCommand(pi, {
     ...toolPort,
     clearSessionUi,
     reconstructState,
-    stopDashboardServer,
+    stopDashboardServer: () => dashboardServer.stop(),
     exportDashboard: (ctx, workDir) => dashboardServer.export(ctx, workDir),
     loopOptions,
   });
