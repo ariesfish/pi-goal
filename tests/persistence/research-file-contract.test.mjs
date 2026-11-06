@@ -32,7 +32,9 @@ test("research file contract summarizes active research files and config header"
     assert.equal(contract.hasIdeas, true);
     assert.equal(contract.hasJournal, true);
     assert.equal(contract.hasConfigHeader, true);
-    assert.equal(contract.hasContract, false);
+    // A config header with no contract entry is a legacy metric contract: the
+    // research has a Goal Contract even though the journal predates the entry.
+    assert.equal(contract.hasContract, true);
     assert.equal(contract.hasRuns, false);
     assert.equal(contract.metricName, "total_ms");
     assert.equal(shouldUseScriptCommandOnly(contract), true);
@@ -41,7 +43,7 @@ test("research file contract summarizes active research files and config header"
       hasRules: true,
       hasConfig: true,
       hasBenchmarkScript: true,
-      hasContract: false,
+      hasContract: true,
     });
     assert.equal(promptSnapshotFor(contract).mdPath.endsWith("goal.md"), true);
   } finally {

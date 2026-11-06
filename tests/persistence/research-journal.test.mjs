@@ -5,6 +5,7 @@ import test from "node:test";
 import { tmpdir } from "node:os";
 
 import { appendHookLogEntryIfConfigured } from "../../extensions/pi-goal/execution/hooks.ts";
+import { appendConfigEntry, journalPath, tempProject } from "../helpers/research-fixture.mjs";
 import {
   extractResearchName,
   hasResearchConfigHeader,
@@ -85,5 +86,51 @@ test("hook observability does not create jsonl before config exists", () => {
     );
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("journal snapshots are reused until the journal changes", async () => {
+  const { readJournalSnapshot, appendRunResultToJournal } = await import(
+    "../../extensions/pi-goal/persistence/research-journal.ts"
+  );
+  const { selectActiveResearch } = await import(
+    "../../extensions/pi-goal/persistence/research-directory.ts"
+  );
+  const projectDir = tempProject("pi-goal-snapshot");
+  try {
+    selectActiveResearch(projectDir, "default");
+    appendConfigEntry(projectDir);
+
+    const first = readJournalSnapshot(projectDir);
+    assert.equal(readJournalSnapshot(projectDir), first);
+
+    appendRunResultToJournal(projectDir, {
+      run: 1,
+      commit: "abc1234",
+      metric: 100,
+      status: "keep",
+      description: "baseline",
+      timestamp: 1,
+      experimentIndex: 0,
+    });
+    const afterAppend = readJournalSnapshot(projectDir);
+    assert.notEqual(afterAppend, first);
+    assert.equal(afterAppend.state.results.length, 1);
+
+    // An append that bypasses the module still invalidates on file identity.
+    fs.appendFileSync(journalPath(projectDir), JSON.stringify({
+      run: 2,
+      commit: "def5678",
+      metric: 90,
+      status: "keep",
+      description: "faster",
+      timestamp: 2,
+      experimentIndex: 0,
+    }) + "\n");
+    const afterExternalAppend = readJournalSnapshot(projectDir);
+    assert.notEqual(afterExternalAppend, afterAppend);
+    assert.equal(afterExternalAppend.state.results.length, 2);
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
   }
 });

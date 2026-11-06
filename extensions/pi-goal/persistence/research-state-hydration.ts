@@ -1,11 +1,25 @@
 import { createResearchState, type ResearchState } from "../domain/research-state.ts";
 import { legacyMetricContract } from "../domain/goal-contract.ts";
-import { parseResearchJournal } from "./research-journal-codec.ts";
+import { parseResearchJournal, type ParsedJournal } from "./research-journal-codec.ts";
+
+/**
+ * Parse the journal and normalize it: legacy journals carry no contract entry,
+ * so a config header hydrates the one-criterion metric contract the phased
+ * protocol replaced. Callers that cache this must treat the state as read-only.
+ */
+export function replayJournal(jsonlContent: string): ParsedJournal {
+  const parsed = parseResearchJournal(jsonlContent);
+  if (!parsed.state.contract && parsed.hasConfig) {
+    parsed.state.contract = legacyMetricContract({
+      metricName: parsed.state.metricName,
+      direction: parsed.state.bestDirection,
+    });
+  }
+  return parsed;
+}
 
 export function researchStateFromJournal(jsonlContent: string): ResearchState {
-  const state = createResearchState();
-  hydrateResearchStateFromJournal(state, jsonlContent);
-  return state;
+  return replayJournal(jsonlContent).state;
 }
 
 /**
@@ -13,17 +27,7 @@ export function researchStateFromJournal(jsonlContent: string): ResearchState {
  * at least one Run Result.
  */
 export function hydrateResearchStateFromJournal(state: ResearchState, jsonlContent: string): boolean {
-  const { state: parsed, hasConfig } = parseResearchJournal(jsonlContent);
-  Object.assign(state, parsed);
-
-  // Legacy journals carry no contract entry; a config header is enough to
-  // hydrate the one-criterion metric contract the phased protocol replaced.
-  if (!state.contract && hasConfig) {
-    state.contract = legacyMetricContract({
-      metricName: state.metricName,
-      direction: state.bestDirection,
-    });
-  }
-
-  return state.results.length > 0;
+  const replay = replayJournal(jsonlContent);
+  Object.assign(state, replay.state);
+  return replay.state.results.length > 0;
 }

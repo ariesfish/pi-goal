@@ -1,10 +1,7 @@
 import * as fs from "node:fs";
 
 import { activeResearch, resolveResearchFilePath } from "./research-directory.ts";
-import {
-  hasResearchConfigHeader,
-  parseResearchJournal,
-} from "./research-journal-codec.ts";
+import { readJournalSnapshot } from "./research-journal.ts";
 import {
   researchValidationError,
   type ResearchValidationIssue,
@@ -23,6 +20,7 @@ export interface ResearchFileContract {
   hasIdeas: boolean;
   hasJournal: boolean;
   hasConfigHeader: boolean;
+  /** The research has a Goal Contract, including a legacy one from a config header. */
   hasContract: boolean;
   hasRuns: boolean;
   metricName: string | null;
@@ -59,13 +57,13 @@ export function readResearchFileContract(workDir: string): ResearchFileContract 
 
   if (hasJournal) {
     try {
-      const content = fs.readFileSync(journalPath, "utf-8");
-      hasConfigHeader = hasResearchConfigHeader(content);
-      if (hasConfigHeader) {
-        const { state } = parseResearchJournal(content);
-        metricName = state.metricName;
-        hasContract = state.contract !== null;
-        hasRuns = state.results.length > 0;
+      // Cached by the journal module: this runs on every turn.
+      const snapshot = readJournalSnapshot(workDir);
+      hasConfigHeader = snapshot?.hasConfig === true;
+      if (snapshot && hasConfigHeader) {
+        metricName = snapshot.state.metricName;
+        hasContract = snapshot.state.contract !== null;
+        hasRuns = snapshot.state.results.length > 0;
       }
     } catch (error) {
       journalReadError = error instanceof Error ? error.message : String(error);

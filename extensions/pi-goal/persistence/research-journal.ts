@@ -1,12 +1,17 @@
 import * as fs from "node:fs";
 
-import type { ResearchState, RunResult } from "../domain/research-state.ts";
+import {
+  cloneResearchState,
+  type ResearchState,
+  type RunResult,
+} from "../domain/research-state.ts";
 import type { Direction, GoalContract, ProbeRecord } from "../domain/goal-contract.ts";
 import { activeResearch, ensureActiveResearch } from "./research-directory.ts";
-import { hydrateResearchStateFromJournal } from "./research-state-hydration.ts";
+import { replayJournal } from "./research-state-hydration.ts";
 import {
   isRunResultEntry,
   parseJournalEntry,
+  type ParsedJournal,
 } from "./research-journal-codec.ts";
 
 export interface ExperimentConfigJournalEntry {
@@ -17,20 +22,50 @@ export interface ExperimentConfigJournalEntry {
   bestDirection: "lower" | "higher";
 }
 
-export function readResearchJournalContent(workDir: string): string {
+// ---------------------------------------------------------------------------
+// Reads
+// ---------------------------------------------------------------------------
+
+/**
+ * The journal is append-only and every append goes through this module, so a
+ * replayed snapshot stays valid until the file's identity changes. Without
+ * this, a per-turn caller re-parses the whole journal on every turn.
+ */
+const snapshotCache = new Map<string, { key: string; snapshot: ParsedJournal }>();
+
+export function readJournalSnapshot(workDir: string): ParsedJournal | null {
+  const journalPath = activeResearch(workDir).paths.journal;
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(journalPath);
+  } catch {
+    return null;
+  }
+
+  const key = `${stat.mtimeMs}:${stat.size}`;
+  const cached = snapshotCache.get(journalPath);
+  if (cached && cached.key === key) return cached.snapshot;
+
+  const parsed = replayJournal(fs.readFileSync(journalPath, "utf-8"));
+  snapshotCache.set(journalPath, { key, snapshot: parsed });
+  return parsed;
+}
+
+function readResearchJournalContent(workDir: string): string {
   const journalPath = activeResearch(workDir).paths.journal;
   if (!fs.existsSync(journalPath)) return "";
   return fs.readFileSync(journalPath, "utf-8");
 }
 
-export function readResearchJournalLines(workDir: string): string[] {
+function readResearchJournalLines(workDir: string): string[] {
   return readResearchJournalContent(workDir).split("\n").filter(Boolean);
 }
 
 export function hydrateResearchStateFromJournalFile(state: ResearchState, workDir: string): boolean {
-  const journalPath = activeResearch(workDir).paths.journal;
-  if (!fs.existsSync(journalPath)) return false;
-  return hydrateResearchStateFromJournal(state, fs.readFileSync(journalPath, "utf-8"));
+  const snapshot = readJournalSnapshot(workDir);
+  if (!snapshot) return false;
+  Object.assign(state, cloneResearchState(snapshot.state));
+  return snapshot.state.results.length > 0;
 }
 
 export function readLastRunResult(workDir: string): Record<string, unknown> | null {
@@ -42,38 +77,16 @@ export function readLastRunResult(workDir: string): Record<string, unknown> | nu
   return null;
 }
 
-export function experimentConfigJournalEntry(state: ResearchState): ExperimentConfigJournalEntry {
-  return {
-    type: "config",
-    name: state.name,
-    metricName: state.metricName,
-    metricUnit: state.metricUnit,
-    bestDirection: state.bestDirection,
-  };
-}
+// ---------------------------------------------------------------------------
+// Writes
+// ---------------------------------------------------------------------------
 
-export function appendExperimentConfigToJournal(workDir: string, state: ResearchState): string | null {
+/** The only write path: one append, one cache invalidation. */
+function appendLine(workDir: string, line: string): string | null {
   try {
     const journalPath = ensureActiveResearch(workDir).paths.journal;
-    fs.appendFileSync(journalPath, JSON.stringify(experimentConfigJournalEntry(state)) + "\n");
-    return null;
-  } catch (error) {
-    return journalWriteError(error);
-  }
-}
-
-export function runResultJournalEntry(runNumber: number, runResult: RunResult): Record<string, unknown> {
-  const entry: Record<string, unknown> = {
-    run: runNumber,
-    ...runResult,
-  };
-  if (!runResult.asi) delete entry.asi;
-  return entry;
-}
-
-export function appendRunResultToJournal(workDir: string, entry: Record<string, unknown>): string | null {
-  try {
-    fs.appendFileSync(ensureActiveResearch(workDir).paths.journal, JSON.stringify(entry) + "\n");
+    fs.appendFileSync(journalPath, line + "\n");
+    snapshotCache.delete(journalPath);
     return null;
   } catch (error) {
     return journalWriteError(error);
@@ -85,12 +98,38 @@ function journalWriteError(error: unknown): string {
 }
 
 export function appendJournalEntry(workDir: string, entry: object): string | null {
-  try {
-    fs.appendFileSync(ensureActiveResearch(workDir).paths.journal, JSON.stringify(entry) + "\n");
-    return null;
-  } catch (error) {
-    return journalWriteError(error);
-  }
+  return appendLine(workDir, JSON.stringify(entry));
+}
+
+export function appendExperimentConfigToJournal(workDir: string, state: ResearchState): string | null {
+  return appendJournalEntry(workDir, experimentConfigJournalEntry(state));
+}
+
+export function appendRunResultToJournal(workDir: string, entry: Record<string, unknown>): string | null {
+  return appendJournalEntry(workDir, entry);
+}
+
+// ---------------------------------------------------------------------------
+// Entry builders
+// ---------------------------------------------------------------------------
+
+export function experimentConfigJournalEntry(state: ResearchState): ExperimentConfigJournalEntry {
+  return {
+    type: "config",
+    name: state.name,
+    metricName: state.metricName,
+    metricUnit: state.metricUnit,
+    bestDirection: state.bestDirection,
+  };
+}
+
+export function runResultJournalEntry(runNumber: number, runResult: RunResult): Record<string, unknown> {
+  const entry: Record<string, unknown> = {
+    run: runNumber,
+    ...runResult,
+  };
+  if (!runResult.asi) delete entry.asi;
+  return entry;
 }
 
 export function contractJournalEntry(contract: GoalContract): Record<string, unknown> {
