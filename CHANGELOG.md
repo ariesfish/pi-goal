@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- `run_goal` and `probe_goal` retain metrics printed before large log tails and parse stdout/stderr independently; probe evidence hashes cover the complete output.
+- Full output logs finish writing before a command returns, and log write failures are reported instead of crashing pi.
+- Timed out or cancelled commands that ignore SIGTERM are forcibly terminated with their process group; already cancelled commands do not start.
+
+### Changed
+
+- Display output stays within its buffer limit even for oversized single lines, without splitting UTF-8 characters at the retained tail's start.
+- Streamed metric lines larger than 4 KiB are ignored to bound partial-line buffering.
+
 ## [0.5.3] - 2026-11-06
 
 ### Changed

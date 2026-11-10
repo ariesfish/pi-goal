@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import * as os from "node:os";
 import * as path from "node:path";
 
@@ -20,7 +20,6 @@ import {
   type ProbeRecord,
 } from "../domain/goal-contract.ts";
 import type { ResearchState } from "../domain/research-state.ts";
-import { parseMetricLines } from "../execution/experiment-runner.ts";
 import { runShellCommand } from "../execution/shell-command-runner.ts";
 import type { HostExec } from "../support/exec.ts";
 import {
@@ -190,7 +189,7 @@ export async function executeProbeGoal(
     startedAt,
   });
 
-  const parsed = parseMetricLines(run.output);
+  const parsed = run.metrics;
   const value = resolveProbeValue(params.value, parsed, direction.proxyMetric);
   if (value === null) {
     const available = [...parsed.keys()];
@@ -211,7 +210,7 @@ export async function executeProbeGoal(
     evidence: {
       command: params.command,
       value,
-      outputHash: `sha256:${createHash("sha256").update(run.output).digest("hex")}`,
+      outputHash: run.outputHash,
       at,
     },
   };

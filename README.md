@@ -211,6 +211,8 @@ A command reviewer receives the same payload as JSON on stdin and must return th
 METRIC total_ms=123.4
 ```
 
+Metrics are collected independently from stdout and stderr, including lines printed before long logs. Each metric line must fit within 4 KiB (UTF-8, excluding the newline); oversized lines are ignored. Display output is truncated separately, and the complete log is available when the command finishes.
+
 Secondary metrics use the same format:
 
 ```text

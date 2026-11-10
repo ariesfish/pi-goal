@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import test from "node:test";
 
@@ -111,6 +112,31 @@ test("probe_goal records value, evidence hash, and closes the direction", async 
     assert.equal(entries.filter((entry) => entry.type === "probe").length, 1);
     assert.equal(entries.filter((entry) => entry.type === "direction").length, 3);
     assert.equal(runtime.loop.phase, "probing");
+  });
+});
+
+test("probe_goal retains early metrics and hashes the complete output", async () => {
+  await withTempResearch("probe-long-output", async (workDir) => {
+    const runtime = setup();
+    executeFrameGoal(
+      { directions: [card("D1"), card("D2")] },
+      { runtime, workDir, confirm: async () => true },
+    );
+    const output = "METRIC total_ms=9800\n" + "x".repeat(250000) + "\n";
+
+    const result = await executeProbeGoal(
+      {
+        direction_id: "D1",
+        command: `node -e 'process.stdout.write("METRIC total_ms=9800\\n" + "x".repeat(250000) + "\\n")'`,
+        decision: "keep",
+      },
+      { runtime, workDir, confirm: async () => true },
+    );
+
+    assert.equal(result.ok, true, result.text);
+    const evidence = runtime.state.directions.find((entry) => entry.id === "D1").evidence;
+    assert.equal(evidence.value, 9800);
+    assert.equal(evidence.outputHash, `sha256:${createHash("sha256").update(output).digest("hex")}`);
   });
 });
 

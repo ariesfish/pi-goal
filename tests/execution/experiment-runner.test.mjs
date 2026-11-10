@@ -90,6 +90,28 @@ test("runExperiment stores full output and streams truncated updates for large o
   }
 });
 
+test("runExperiment retains metrics printed before a large log tail", async () => {
+  const workDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-early-metrics-"));
+  let fullOutputPath;
+  try {
+    const result = await runExperiment({
+      command: `node -e 'process.stdout.write("METRIC total_ms=12\\nMETRIC guard=3\\n" + "x".repeat(250000) + "\\n")'`,
+      workDir,
+      metricName: "total_ms",
+      metricUnit: "ms",
+      pi: { async exec() { throw new Error("No checks expected"); } },
+    });
+    fullOutputPath = result.fullOutputPath;
+
+    assert.equal(result.details.passed, true);
+    assert.equal(result.details.parsedPrimary, 12);
+    assert.deepEqual(result.details.parsedMetrics, { total_ms: 12, guard: 3 });
+  } finally {
+    fs.rmSync(workDir, { recursive: true, force: true });
+    if (fullOutputPath) fs.rmSync(fullOutputPath, { force: true });
+  }
+});
+
 test("runExperiment records timed out checks as a failed Run", async () => {
   const workDir = fs.mkdtempSync(path.join(tmpdir(), "pi-goal-runner-"));
   try {

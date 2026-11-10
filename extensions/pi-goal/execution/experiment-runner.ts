@@ -8,23 +8,13 @@ import { truncateTail, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-wo
 import type { HostExec } from "../support/exec.ts";
 import { runChecks } from "./checks-runner.ts";
 import { runShellCommand } from "./shell-command-runner.ts";
+import type { ExperimentRunUpdate } from "./output-capture.ts";
+
+export { parseMetricLines } from "./metric-parser.ts";
+export { formatElapsed, type ExperimentRunUpdate } from "./output-capture.ts";
 
 export const EXPERIMENT_MAX_LINES = 10;
 export const EXPERIMENT_MAX_BYTES = 4 * 1024;
-
-const METRIC_LINE_PREFIX = "METRIC";
-const DENIED_METRIC_NAMES = new Set(["__proto__", "constructor", "prototype"]);
-
-
-export interface ExperimentRunUpdate {
-  content: [{ type: "text"; text: string }];
-  details: {
-    phase: "running";
-    elapsed: string;
-    truncation?: ReturnType<typeof truncateTail>;
-    fullOutputPath?: string;
-  };
-}
 
 export interface RunExperimentOptions {
   command: string;
@@ -63,21 +53,6 @@ export interface RunExperimentResult {
   fullOutputPath?: string;
 }
 
-export function parseMetricLines(output: string): Map<string, number> {
-  const metrics = new Map<string, number>();
-  const regex = new RegExp(`^${METRIC_LINE_PREFIX}\\s+([\\w.µ]+)=(\\S+)\\s*$`, "gm");
-  let match;
-  while ((match = regex.exec(output)) !== null) {
-    const name = match[1];
-    if (DENIED_METRIC_NAMES.has(name)) continue;
-    const value = Number(match[2]);
-    if (Number.isFinite(value)) {
-      metrics.set(name, value);
-    }
-  }
-  return metrics;
-}
-
 export function isGoalShCommand(command: string): boolean {
   let cmd = command.trim();
 
@@ -103,20 +78,12 @@ function createTempFileAllocator(): () => string {
   };
 }
 
-export function formatElapsed(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  if (m > 0) return `${m}m ${String(s).padStart(2, "0")}s`;
-  return `${s}s`;
-}
-
 export async function runExperiment(options: RunExperimentOptions): Promise<RunExperimentResult> {
   const timeoutMs = (options.timeoutSeconds ?? 600) * 1000;
   const startedAt = Date.now();
   const getTempFile = createTempFileAllocator();
 
-  const { exitCode, timedOut, output, tempFilePath: streamTempFile, actualTotalBytes } = await runShellCommand({
+  const { exitCode, timedOut, output, tempFilePath: streamTempFile, actualTotalBytes, metrics: parsedMetricMap } = await runShellCommand({
     command: options.command,
     workDir: options.workDir,
     timeoutMs,
@@ -156,7 +123,6 @@ export async function runExperiment(options: RunExperimentOptions): Promise<RunE
     maxBytes: EXPERIMENT_MAX_BYTES,
   });
 
-  const parsedMetricMap = parseMetricLines(output);
   const parsedMetrics = parsedMetricMap.size > 0 ? Object.fromEntries(parsedMetricMap) : null;
   const parsedPrimary = parsedMetricMap.get(options.metricName) ?? null;
 
