@@ -23,6 +23,7 @@ export interface RunWorkspaceSettlementOptions {
 }
 
 export interface RunWorkspaceSettlement {
+  ok: boolean;
   text: string;
   /** Set when a kept Run Result landed as a commit. */
   commit: string | null;
@@ -50,7 +51,7 @@ export async function settleRunWorkspace(
       criteriaIds: options.criteriaIds,
       gateHash: options.gateHash,
     });
-    return { text: kept.text, commit: kept.commit, attempt: null };
+    return { ok: kept.ok, text: kept.text, commit: kept.commit, attempt: null };
   }
 
   const rejected = await restoreRejectedRunResult({
@@ -61,5 +62,5 @@ export async function settleRunWorkspace(
     description: options.description,
     attemptsDir: options.attemptsDir,
   });
-  return { text: rejected.text, commit: null, attempt: rejected.attempt };
+  return { ok: rejected.attempt !== null, text: rejected.text, commit: null, attempt: rejected.attempt };
 }

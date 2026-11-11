@@ -24,8 +24,14 @@ test("dirty tree check separates research state from user changes", async () => 
   assert.match(formatWorkspaceSafetyError(check), /src\/app\.ts/);
 });
 
-for (const ignored of [true, false]) {
-  test(`keep commits candidate changes while excluding ${ignored ? "ignored" : "unignored"} research state`, async (t) => {
+for (const scenario of [
+  { name: "ignored", ignored: true, file: ".goal/researches/default/goal.jsonl" },
+  { name: "unignored", ignored: false, file: ".goal/researches/default/goal.jsonl" },
+  { name: "nested", ignored: false, file: "pkg/.goal/researches/default/goal.jsonl" },
+  { name: "a state path that is a file", ignored: false, file: ".goal" },
+]) {
+  const { ignored } = scenario;
+  test(`keep commits candidate changes while excluding ${scenario.name} research state`, async (t) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-goal-keep-state-"));
     t.after(() => fs.rmSync(root, { recursive: true, force: true }));
     const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
@@ -37,8 +43,8 @@ for (const ignored of [true, false]) {
     git("add", ".");
     git("commit", "-q", "-m", "baseline");
     const before = git("rev-parse", "HEAD");
-    fs.mkdirSync(path.join(root, ".goal/researches/default"), { recursive: true });
-    fs.writeFileSync(path.join(root, ".goal/researches/default/goal.jsonl"), "journal evidence\n");
+    fs.mkdirSync(path.dirname(path.join(root, scenario.file)), { recursive: true });
+    fs.writeFileSync(path.join(root, scenario.file), "journal evidence\n");
     fs.writeFileSync(path.join(root, "candidate.txt"), "improved\n");
     const result = await commitKeptRunResult({
       pi: { async exec(command, args, options) {
@@ -50,11 +56,12 @@ for (const ignored of [true, false]) {
       metricName: "speedup", metric: 2, status: "keep", secondaryMetrics: {},
       gateHash: "sha256:test", criteriaIds: ["M1"],
     });
+    assert.equal(result.ok, true, result.text);
     assert.ok(result.commit, result.text);
     assert.notEqual(git("rev-parse", "HEAD"), before);
     assert.equal(git("show", "HEAD:candidate.txt"), "improved");
-    assert.equal(git("ls-files", ".goal"), "");
-    assert.equal(fs.readFileSync(path.join(root, ".goal/researches/default/goal.jsonl"), "utf8"), "journal evidence\n");
+    assert.equal(git("ls-files", ".goal", "pkg/.goal"), "");
+    assert.equal(fs.readFileSync(path.join(root, scenario.file), "utf8"), "journal evidence\n");
     assert.match(git("log", "-1", "--format=%B"), /Gate: sha256:test/);
   });
 }

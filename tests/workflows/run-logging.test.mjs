@@ -195,43 +195,46 @@ test("run logging blocks state mutation when journal append fails", async () => 
   }
 });
 
-test("run logging preserves a kept Run Result when git commit fails", async () => {
-  const projectDir = tempProject("pi-goal-log");
-  try {
-    selectActiveResearch(projectDir, "default");
-    appendConfigEntry(projectDir);
-    const state = createResearchState();
-    state.name = "Speed";
-    state.metricName = "total_ms";
-    state.metricUnit = "ms";
-
-    const result = await recordRunResult({
-      commit: "pending",
-      metric: 100,
-      status: "keep",
-      description: "commit fails",
-      asi: { hypothesis: "commit failure path" },
-    }, fakeDeps(projectDir, state, {
-      pi: {
-        async exec(command, args) {
-          if (command === "git" && args[0] === "diff") return { code: 1, stdout: "", stderr: "" };
-          if (command === "git" && args[0] === "commit") return { code: 1, stdout: "", stderr: "no identity" };
-          return { code: 0, stdout: "", stderr: "" };
+for (const failure of ["add", "commit"]) {
+  test(`run logging blocks a keep when git ${failure} fails`, async () => {
+    const projectDir = tempProject("pi-goal-log");
+    try {
+      selectActiveResearch(projectDir, "default");
+      appendConfigEntry(projectDir);
+      const state = createResearchState();
+      state.name = "Speed";
+      state.metricName = "total_ms";
+      state.metricUnit = "ms";
+      const before = fs.readFileSync(journalPath(projectDir), "utf-8");
+      let hooks = 0;
+      const deps = fakeDeps(projectDir, state, {
+        async fireHook() { hooks += 1; return null; },
+        pi: {
+          async exec(command, args) {
+            if (command === "git" && args[0] === "diff") return { code: 1, stdout: "", stderr: "" };
+            if (command === "git" && args[0] === failure) return { code: 1, stdout: "", stderr: "injected git failure" };
+            return { code: 0, stdout: "", stderr: "" };
+          },
         },
-      },
-    }));
+      });
+      const result = await recordRunResult({
+        commit: "pending", metric: 100, status: "keep",
+        description: "settlement fails", asi: { hypothesis: "commit failure path" },
+      }, deps);
 
-    assert.equal(result.ok, true);
-    assert.match(result.text, /Git commit failed/);
-    assert.equal(result.runResult.commit, "pending");
-    assert.equal(state.results.length, 1);
-    const entry = JSON.parse(fs.readFileSync(journalPath(projectDir), "utf-8").trim().split("\n")[1]);
-    assert.equal(entry.description, "commit fails");
-    assert.equal(entry.commit, "pending");
-  } finally {
-    fs.rmSync(projectDir, { recursive: true, force: true });
-  }
-});
+      assert.equal(result.ok, false);
+      assert.match(result.text, /Git (add|commit)/);
+      assert.match(result.text, /retry log_goal/);
+      assert.doesNotMatch(result.text, /Logged #/);
+      assert.equal(state.results.length, 0);
+      assert.equal(state.baselineMetric, null);
+      assert.equal(hooks, 0);
+      assert.equal(fs.readFileSync(journalPath(projectDir), "utf-8"), before);
+    } finally {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+}
 
 test("a journal failure after a kept Run Result committed reports the landed commit", async () => {
   const projectDir = tempProject("pi-goal-log");

@@ -27,6 +27,7 @@ export interface CommitKeptRunResultOptions {
 }
 
 export interface CommitKeptRunResult {
+  ok: boolean;
   text: string;
   commit: string | null;
 }
@@ -84,6 +85,7 @@ export async function commitKeptRunResult(
 ): Promise<CommitKeptRunResult> {
   let text = "";
   let commit: string | null = null;
+  let ok = true;
 
   try {
     const resultData: Record<string, unknown> = {
@@ -102,7 +104,7 @@ export async function commitKeptRunResult(
     const execOpts = { cwd: options.workDir, timeout: 10000 };
     const addResult = await options.pi.exec(
       "git",
-      ["add", "-A", "--", ".", ":(exclude,glob)**/.goal/**"],
+      ["add", "-A", "--", ".", ":(exclude,glob)**/.goal", ":(exclude,glob)**/.goal/**"],
       execOpts,
     );
     if (addResult.code !== 0) {
@@ -130,14 +132,16 @@ export async function commitKeptRunResult(
           // Keep caller-provided commit hash if rev-parse fails.
         }
       } else {
+        ok = false;
         text += `\n⚠️ Git commit failed (exit ${gitResult.code}): ${gitOutput.slice(0, 200)}`;
       }
     }
   } catch (e) {
+    ok = false;
     text += `\n⚠️ Git commit error: ${e instanceof Error ? e.message : String(e)}`;
   }
 
-  return { text, commit };
+  return { ok, text, commit };
 }
 
 export interface RestoreRejectedRunResult {

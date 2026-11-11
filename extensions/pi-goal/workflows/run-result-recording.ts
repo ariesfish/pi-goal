@@ -116,6 +116,12 @@ export async function recordRunResult(params: LogRunParams, deps: RecordRunResul
   let settlement: RunWorkspaceSettlement | null = null;
   if (params.status === "keep") {
     settlement = await settleWorkspace(params, prepared, deps, keepChecks?.ok ? keepChecks.summaries : null);
+    if (!settlement.ok) {
+      return {
+        ok: false,
+        text: `❌ Keep not logged: Git workspace settlement failed.${settlement.text}\nCandidate changes and the measured run are preserved. Fix Git and retry log_goal before another run.`,
+      };
+    }
     text += settlement.text;
     if (settlement.commit) prepared.applied.runResult.commit = settlement.commit;
   }
