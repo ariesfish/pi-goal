@@ -10,6 +10,7 @@
 
 ### Changed
 
+- The fullscreen dashboard shortcut defaults to `ctrl+shift+d` instead of `ctrl+shift+f`, which pi reserves for the built-in `tui.altScreen.search`; users who set `shortcuts.fullscreenDashboard` keep their binding.
 - Display output stays within its buffer limit even for oversized single lines, without splitting UTF-8 characters at the retained tail's start.
 - Streamed metric lines larger than 4 KiB are ignored to bound partial-line buffering.
 

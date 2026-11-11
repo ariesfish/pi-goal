@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
 export const DEFAULT_TOGGLE_DASHBOARD_SHORTCUT = "ctrl+shift+t";
-export const DEFAULT_FULLSCREEN_DASHBOARD_SHORTCUT = "ctrl+shift+f";
+// ctrl+shift+f is pi's built-in tui.altScreen.search binding; a plugin shortcut
+// silently shadows it, so the dashboard default lives on a free key instead.
+export const DEFAULT_FULLSCREEN_DASHBOARD_SHORTCUT = "ctrl+shift+d";
 
 const CONFIG_FILE_NAME = "pi-goal.json";
 

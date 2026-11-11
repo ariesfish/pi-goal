@@ -279,7 +279,7 @@ Hooks receive one JSON object on stdin, write steer text on stdout, timeout afte
 
 - Status widget: `🎯 sealed 12 runs 8 kept │ ★ total_µs: 15,200 (-12.3%) │ 3/4 criteria`
 - `Ctrl+Shift+T`: expand/collapse inline dashboard
-- `Ctrl+Shift+F`: fullscreen scrollable dashboard
+- `Ctrl+Shift+D`: fullscreen scrollable dashboard
 - `/goal export`: live browser dashboard
 
 Override shortcuts in `<agent-dir>/extensions/pi-goal.json`.
