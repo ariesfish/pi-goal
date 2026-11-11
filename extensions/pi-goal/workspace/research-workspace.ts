@@ -102,7 +102,7 @@ export async function commitKeptRunResult(
     const execOpts = { cwd: options.workDir, timeout: 10000 };
     const addResult = await options.pi.exec(
       "git",
-      ["add", "-A", "--", ".", ":(exclude).goal", ":(exclude,glob)**/.goal/**"],
+      ["add", "-A", "--", ".", ":(exclude,glob)**/.goal/**"],
       execOpts,
     );
     if (addResult.code !== 0) {
